@@ -97,6 +97,7 @@ temp/
 
 # CMake
 cmake-build-*/
+samples/build*/
 
 # Mongo Explorer plugin
 .idea/**/mongoSettings.xml
@@ -449,4 +450,3 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/windows,macos,linux,c++,visualstudiocode,clion,python,cmake
-

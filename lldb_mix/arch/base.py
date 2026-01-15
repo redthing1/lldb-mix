@@ -1,0 +1,38 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class ArchSpec:
+    name: str
+    ptr_size: int
+    gpr_names: tuple[str, ...]
+    pc_reg: str
+    sp_reg: str
+    flags_reg: str | None = None
+    special_regs: tuple[str, ...] = ()
+    max_inst_bytes: int = 4
+
+    def format_flags(self, value: int) -> str:
+        return ""
+
+    def is_conditional_branch(self, mnemonic: str) -> bool:
+        _ = mnemonic
+        return False
+
+    def branch_taken(self, mnemonic: str, flags: int) -> tuple[bool, str]:
+        _ = mnemonic
+        _ = flags
+        return False, ""
+
+
+UNKNOWN_ARCH = ArchSpec(
+    name="unknown",
+    ptr_size=0,
+    gpr_names=(),
+    pc_reg="",
+    sp_reg="",
+    flags_reg=None,
+    special_regs=(),
+)
