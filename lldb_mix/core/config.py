@@ -51,6 +51,7 @@ def _settings_dict(settings: Settings) -> dict[str, object]:
         "max_string_length": settings.max_string_length,
         "auto_context": settings.auto_context,
         "stack_lines": settings.stack_lines,
+        "stack_frame_lines": settings.stack_frame_lines,
         "memory_window_bytes": settings.memory_window_bytes,
         "memory_bytes_per_line": settings.memory_bytes_per_line,
         "code_lines_before": settings.code_lines_before,
@@ -76,6 +77,8 @@ def _apply_settings(settings: Settings, data: dict[str, object]) -> None:
         settings.auto_context = data["auto_context"]
     if isinstance(data.get("stack_lines"), int):
         settings.stack_lines = data["stack_lines"]
+    if isinstance(data.get("stack_frame_lines"), int):
+        settings.stack_frame_lines = data["stack_frame_lines"]
     if isinstance(data.get("memory_window_bytes"), int):
         settings.memory_window_bytes = data["memory_window_bytes"]
     if isinstance(data.get("memory_bytes_per_line"), int):

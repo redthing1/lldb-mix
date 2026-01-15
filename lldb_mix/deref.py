@@ -46,7 +46,17 @@ def deref_chain(
         seen.add(current)
 
         region = find_region(current, regions)
-        if not region or not region.read:
+        if not region:
+            break
+        if region.execute:
+            if resolver:
+                symbol = resolver.resolve(current)
+                if symbol:
+                    chain.append(format_symbol(symbol))
+                    break
+            chain.append(format_region(region))
+            break
+        if not region.read:
             break
 
         ptr = reader.read_pointer(current, ptr_size)
@@ -86,10 +96,14 @@ def summarize_chain(chain: list[str]) -> str | None:
 
 
 def classify_token(token: str) -> str:
+    if token == "[loop]":
+        return "loop"
     if token.startswith("\"") and token.endswith("\""):
         return "string"
     if "!" in token:
         return "symbol"
+    if token.startswith("[") and token.endswith("]"):
+        return "region"
     if token.startswith("0x"):
         return "addr"
     return "other"
@@ -101,6 +115,9 @@ def _pick_best_token(tokens: list[str]) -> str:
             return token
     for token in reversed(tokens):
         if classify_token(token) == "symbol":
+            return token
+    for token in reversed(tokens):
+        if classify_token(token) == "region":
             return token
     return tokens[-1]
 
@@ -148,3 +165,41 @@ def format_symbol(symbol: SymbolInfo) -> str:
     if symbol.offset:
         return f"{prefix}{symbol.name}+0x{symbol.offset:x}"
     return f"{prefix}{symbol.name}"
+
+
+def format_region(region: MemoryRegion) -> str:
+    perms = "".join(
+        [
+            "r" if region.read else "-",
+            "w" if region.write else "-",
+            "x" if region.execute else "-",
+        ]
+    )
+    name = (region.name or "").strip()
+    if name:
+        return f"[{perms} {name}]"
+    return f"[{perms}]"
+
+
+def last_addr(chain: list[str]) -> int | None:
+    for token in reversed(chain):
+        if token.startswith("0x"):
+            try:
+                return int(token, 16)
+            except ValueError:
+                continue
+    return None
+
+
+def region_tag(addr: int | None, regions: Iterable[MemoryRegion]) -> str | None:
+    if addr is None:
+        return None
+    region = find_region(addr, regions)
+    if not region:
+        return None
+    if region.execute:
+        return format_region(region)
+    name = (region.name or "").lower()
+    if "stack" in name:
+        return format_region(region)
+    return None

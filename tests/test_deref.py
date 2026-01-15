@@ -54,7 +54,7 @@ class TestDerefChain(unittest.TestCase):
 
     def test_deref_chain_symbol(self):
         reader = FakeReader([(0x1000, (0x2000).to_bytes(8, "little"))])
-        regions = [MemoryRegion(0x1000, 0x3000, True, True, True, None)]
+        regions = [MemoryRegion(0x1000, 0x3000, True, True, False, None)]
         resolver = FakeResolver({0x2000: SymbolInfo("func", "mod", 0x10)})
         chain = deref_chain(0x1000, reader, regions, resolver, Settings(), 8)
         self.assertEqual(

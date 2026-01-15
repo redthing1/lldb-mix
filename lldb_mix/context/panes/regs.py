@@ -6,6 +6,8 @@ from lldb_mix.deref import (
     classify_token,
     deref_chain,
     format_addr,
+    last_addr,
+    region_tag,
     summarize_chain,
 )
 
@@ -20,6 +22,7 @@ class RegsPane(Pane):
         lines = [self.title(ctx)]
         ptr_size = arch.ptr_size or 8
         reg_names = [name for name in arch.gpr_names if name in regs]
+        flags_reg = arch.flags_reg
 
         if not reg_names:
             lines.append("(no registers)")
@@ -27,14 +30,19 @@ class RegsPane(Pane):
 
         name_width = max(len(name) for name in reg_names)
         entries: list[tuple[str, int]] = []
-        pointers: list[tuple[str, str, str]] = []
+        pointers: list[tuple[str, str, str, str | None]] = []
 
         for reg_name in reg_names:
             value = regs[reg_name]
+            is_flags = bool(flags_reg and reg_name == flags_reg)
             changed = (
                 reg_name in ctx.last_regs and ctx.last_regs.get(reg_name) != value
             )
-            value_text = format_addr(value, ptr_size)
+            if is_flags:
+                flags_text = arch.format_flags(value)
+                value_text = flags_text if flags_text else format_addr(value, ptr_size)
+            else:
+                value_text = format_addr(value, ptr_size)
             name_text = f"{reg_name:{name_width}}"
             name_colored = self.style(ctx, name_text, "reg_name")
             value_role = "reg_changed" if changed else "reg_value"
@@ -44,7 +52,7 @@ class RegsPane(Pane):
             cell_plain = f"{name_text}: {value_text}"
             entries.append((cell_text, len(cell_plain)))
 
-            if ctx.settings.aggressive_deref and ctx.reader:
+            if not is_flags and ctx.settings.aggressive_deref and ctx.reader:
                 chain = deref_chain(
                     value,
                     ctx.reader,
@@ -56,8 +64,12 @@ class RegsPane(Pane):
                 summary = summarize_chain(chain)
                 if summary:
                     kind = classify_token(summary)
-                    if kind in ("string", "symbol"):
-                        pointers.append((reg_name, summary, kind))
+                    if kind in ("string", "symbol", "region"):
+                        addr = last_addr(chain)
+                        tag = None
+                        if kind == "symbol":
+                            tag = region_tag(addr, snapshot.maps)
+                        pointers.append((reg_name, summary, kind, tag))
 
         cell_width = max(length for _, length in entries)
         col_sep = 2
@@ -73,11 +85,17 @@ class RegsPane(Pane):
 
         if pointers:
             lines.append(self.style(ctx, "pointers:", "label"))
-            for reg_name, summary, kind in pointers:
+            for reg_name, summary, kind, tag in pointers:
                 role = "string" if kind == "string" else "symbol"
-                reg_text = self.style(ctx, reg_name, "reg_name")
+                if kind == "region":
+                    role = "muted"
+                reg_text = self.style(ctx, f"{reg_name:<{name_width}}", "reg_name")
                 arrow = self.style(ctx, "->", "arrow")
                 summary_text = self.style(ctx, summary, role)
-                lines.append(f"  {reg_text} {arrow} {summary_text}")
+                line = f"  {reg_text} {arrow} {summary_text}"
+                if tag:
+                    tag_text = self.style(ctx, tag, "muted")
+                    line = f"{line} {tag_text}"
+                lines.append(line)
 
         return lines

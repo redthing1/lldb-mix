@@ -3,6 +3,7 @@ from __future__ import annotations
 from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.types import PaneContext
 from lldb_mix.core.disasm import read_instructions
+from lldb_mix.core.flow import resolve_flow_target
 from lldb_mix.deref import format_addr, format_symbol
 
 
@@ -34,7 +35,7 @@ class FlowPane(Pane):
             lines.append(f"{mnemonic} {inst.operands}")
         else:
             lines.append(mnemonic)
-        target = _resolve_flow_target(inst.mnemonic, inst.operands, snapshot.regs)
+        target = resolve_flow_target(inst.mnemonic, inst.operands, snapshot.regs)
         if target is None:
             lines.append("(no flow target resolved)")
             return lines
@@ -49,26 +50,3 @@ class FlowPane(Pane):
         label = self.style(ctx, "target:", "label")
         lines.append(f"{label} {target_line}")
         return lines
-
-
-def _resolve_flow_target(mnemonic: str, operands: str, regs: dict[str, int]) -> int | None:
-    mnem = mnemonic.lower()
-    if not operands and not mnem.startswith("ret"):
-        return None
-
-    if mnem.startswith("ret"):
-        if "lr" in regs:
-            return regs.get("lr")
-        return None
-
-    op = operands.split(",", 1)[0].strip()
-    if op.startswith("#"):
-        op = op[1:]
-    if op.startswith("0x"):
-        try:
-            return int(op, 16)
-        except ValueError:
-            return None
-    if op in regs:
-        return regs.get(op)
-    return None

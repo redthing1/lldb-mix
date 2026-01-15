@@ -13,6 +13,7 @@ class Settings:
     max_string_length: int = 64
     auto_context: bool = True
     stack_lines: int = 8
+    stack_frame_lines: int = 2
     memory_window_bytes: int = 64
     memory_bytes_per_line: int = 16
     code_lines_before: int = 3
