@@ -73,4 +73,7 @@ ARM64_ARCH = Arm64Arch(
     flags_reg="cpsr",
     special_regs=("fp", "lr"),
     max_inst_bytes=4,
+    return_reg="x0",
+    nop_bytes=b"\x1f\x20\x03\xd5",
+    break_bytes=b"\x00\x00\x20\xd4",
 )

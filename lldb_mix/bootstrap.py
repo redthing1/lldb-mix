@@ -42,6 +42,9 @@ def init(debugger, internal_dict) -> None:
         debugger.HandleCommand("script import lldb_mix.commands.watch")
         debugger.HandleCommand("script import lldb_mix.commands.bp")
         debugger.HandleCommand("script import lldb_mix.commands.session")
+        debugger.HandleCommand("script import lldb_mix.commands.patch")
+        debugger.HandleCommand("script import lldb_mix.commands.ret")
+        debugger.HandleCommand("script import lldb_mix.commands.deref")
     except Exception as exc:
         err(f"failed to import commands via lldb script: {exc}")
         return
@@ -123,6 +126,18 @@ def init(debugger, internal_dict) -> None:
     _register_command(
         debugger,
         "command script add -f lldb_mix.commands.session.cmd_session sess",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.patch.cmd_patch patch",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.ret.cmd_ret ret",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.deref.cmd_deref deref",
     )
 
     load_settings(SETTINGS)

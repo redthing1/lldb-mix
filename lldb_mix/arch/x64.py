@@ -144,4 +144,7 @@ X64_ARCH = X64Arch(
     flags_reg="rflags",
     special_regs=("cs", "ss", "ds", "es", "fs", "gs"),
     max_inst_bytes=15,
+    return_reg="rax",
+    nop_bytes=b"\x90",
+    break_bytes=b"\xcc",
 )

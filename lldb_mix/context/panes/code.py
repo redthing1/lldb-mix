@@ -6,7 +6,13 @@ from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.types import PaneContext
 from lldb_mix.core.disasm import read_instructions_around
 from lldb_mix.core.flow import is_branch_like, resolve_flow_target
-from lldb_mix.deref import format_addr, format_symbol
+from lldb_mix.deref import (
+    classify_token,
+    deref_chain,
+    format_addr,
+    format_symbol,
+    summarize_chain,
+)
 
 
 class CodePane(Pane):
@@ -80,7 +86,15 @@ class CodePane(Pane):
                 if hint:
                     comment_parts.append(hint)
                 comment_parts.extend(
-                    _operand_annotations(inst.operands, snapshot.regs, ptr_size)
+                    _operand_annotations(
+                        inst.operands,
+                        snapshot.regs,
+                        ptr_size,
+                        ctx.reader,
+                        snapshot.maps,
+                        ctx.resolver,
+                        ctx.settings,
+                    )
                 )
                 if is_branch_like(inst.mnemonic):
                     target = resolve_flow_target(
@@ -109,6 +123,10 @@ def _operand_annotations(
     operands: str,
     regs: dict[str, int],
     ptr_size: int,
+    reader,
+    regions,
+    resolver,
+    settings,
     max_regs: int = 3,
 ) -> list[str]:
     if not operands or not regs:
@@ -134,15 +152,38 @@ def _operand_annotations(
         if len(reg_hits) >= max_regs:
             break
 
-    pieces = [
-        f"{display}={format_addr(regs[canon], ptr_size)}"
-        for display, canon in reg_hits
-    ]
+    pieces: list[str] = []
+    for display, canon in reg_hits:
+        value = regs[canon]
+        addr_text = format_addr(value, ptr_size)
+        summary = _annotation_for_addr(value, reader, regions, resolver, settings, ptr_size)
+        if summary:
+            pieces.append(f"{display}={addr_text}->{summary}")
+        else:
+            pieces.append(f"{display}={addr_text}")
 
     mem_addr = _compute_mem_addr(operands, regs, pattern)
     if mem_addr is not None:
-        pieces.append(f"mem={format_addr(mem_addr, ptr_size)}")
+        mem_text = format_addr(mem_addr, ptr_size)
+        summary = _annotation_for_addr(mem_addr, reader, regions, resolver, settings, ptr_size)
+        if summary:
+            pieces.append(f"mem={mem_text}->{summary}")
+        else:
+            pieces.append(f"mem={mem_text}")
     return pieces
+
+
+def _annotation_for_addr(addr, reader, regions, resolver, settings, ptr_size: int) -> str | None:
+    if not reader or not settings or not settings.aggressive_deref:
+        return None
+    chain = deref_chain(addr, reader, regions or [], resolver, settings, ptr_size)
+    summary = summarize_chain(chain)
+    if not summary:
+        return None
+    kind = classify_token(summary)
+    if kind in ("string", "symbol", "region"):
+        return summary
+    return None
 
 
 def _compute_mem_addr(

@@ -19,6 +19,15 @@ class TargetSymbolResolver:
         return resolve_symbol(self.target, addr)
 
 
+def is_placeholder_symbol(name: str) -> bool:
+    if not name:
+        return True
+    lowered = name.strip().lower()
+    if lowered.startswith("___lldb_unnamed_symbol"):
+        return True
+    return False
+
+
 def resolve_symbol(target: Any, address: int) -> SymbolInfo | None:
     try:
         import lldb
@@ -35,7 +44,7 @@ def resolve_symbol(target: Any, address: int) -> SymbolInfo | None:
         return None
 
     name = symbol.GetName() or ""
-    if not name:
+    if is_placeholder_symbol(name):
         return None
 
     module = ""

@@ -2,12 +2,8 @@ from __future__ import annotations
 
 import shlex
 
-from lldb_mix.commands.utils import (
-    emit_result,
-    eval_expression,
-    module_fullpath,
-    resolve_addr,
-)
+from lldb_mix.commands.utils import emit_result, eval_expression, resolve_addr
+from lldb_mix.core.modules import find_module, module_base, module_name
 from lldb_mix.core.disasm import read_instructions
 from lldb_mix.core.session import Session
 from lldb_mix.core.snapshot import capture_snapshot
@@ -37,12 +33,12 @@ def cmd_bpm(debugger, command, result, internal_dict) -> None:
         emit_result(result, "[lldb-mix] target unavailable", lldb)
         return
 
-    module = _find_module(target, module_token)
+    module = find_module(target, module_token)
     if not module:
         emit_result(result, f"[lldb-mix] module not found: {module_token}", lldb)
         return
 
-    base = _module_base(target, module, lldb)
+    base = module_base(target, module, lldb)
     if base is None:
         emit_result(result, "[lldb-mix] module base unavailable", lldb)
         return
@@ -54,11 +50,11 @@ def cmd_bpm(debugger, command, result, internal_dict) -> None:
         return
 
     ptr_size = target.GetAddressByteSize() or 8
-    module_name = module.GetFileSpec().GetFilename() or module_token
+    mod_name = module_name(module) or module_token
     addr_text = format_addr(addr, ptr_size)
     emit_result(
         result,
-        f"[lldb-mix] bpm {module_name}+0x{offset:x} -> {addr_text} (bp {bp.GetID()})",
+        f"[lldb-mix] bpm {mod_name}+0x{offset:x} -> {addr_text} (bp {bp.GetID()})",
         lldb,
     )
 
@@ -72,33 +68,6 @@ def _parse_int(text: str) -> int | None:
         return int(text, 0)
     except ValueError:
         return None
-
-
-def _find_module(target, token: str):
-    for module in target.module_iter():
-        spec = module.GetFileSpec()
-        filename = spec.GetFilename() if spec else ""
-        path = module_fullpath(module)
-        if token == filename or token == path:
-            return module
-        if path and path.endswith(f"/{token}"):
-            return module
-    return None
-
-
-def _module_base(target, module, lldb_module) -> int | None:
-    invalid = getattr(lldb_module, "LLDB_INVALID_ADDRESS", 0xFFFFFFFFFFFFFFFF)
-    header = module.GetObjectFileHeaderAddress()
-    if header and header.IsValid():
-        base = header.GetLoadAddress(target)
-        if base not in (invalid, 0xFFFFFFFFFFFFFFFF):
-            return base
-    section = module.GetSectionAtIndex(0)
-    if section and section.IsValid():
-        base = section.GetLoadAddress(target)
-        if base not in (invalid, 0xFFFFFFFFFFFFFFFF):
-            return base
-    return None
 
 
 def cmd_bpt(debugger, command, result, internal_dict) -> None:

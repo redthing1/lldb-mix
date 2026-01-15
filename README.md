@@ -24,6 +24,9 @@ u [addr|reg|pc] [count]       # disassemble instructions
 findmem ...                   # search memory across regions
 rr [args...]                  # run to entrypoint (stop at entry)
 skip [count]                  # skip N instructions (default 1)
+deref [addr|reg|expr] [-d n]  # explain an address via deref chain
+patch ...                     # patch memory (write/nop/int3/null/restore/list)
+ret [value]                   # return from current frame
 watch add <expr> [label]      # add watch expression
 watch list|del|clear          # manage watches
 bp list|enable|disable|clear  # breakpoint management
@@ -72,13 +75,18 @@ lldb samples/build/sample_basic
 (lldb) run
 (lldb) conf set layout regs stack watch code
 (lldb) conf list
+(lldb) deref $sp
 (lldb) watch add $sp stack
 (lldb) sess save
 (lldb) dump sp 64
 (lldb) u
 (lldb) skip
+(lldb) patch nop $pc 1
+(lldb) patch list
+(lldb) patch restore $pc
 (lldb) sess load
 (lldb) findmem -s hello -c 1
+(lldb) ret 0
 ```
 
 ### Manual Validation Notes
@@ -87,8 +95,11 @@ lldb samples/build/sample_basic
 - `conf list` prints available settings; `conf set theme base` switches without errors.
 - `dump sp 64` shows a `[dump] 0x... len=64 width=16` header and four hexdump lines.
 - `skip` prints a `[lldb-mix] skip 1 -> 0x...` line and updates the PC.
+- `deref $sp` prints a `[deref]` header with region, symbol, and deref chain info.
 - After `watch add $sp`, the `[watch]` pane shows the watch entry when the layout includes `watch`.
 - `sess save` writes a session file and `sess load` restores watches and breakpoints.
+- `patch nop $pc 1` reports the patched address and `patch restore $pc` restores the original bytes.
+- `ret 0` returns from the current frame and prints a confirmation line.
 - `db pc 64`/`dw pc 64`/`dd pc 64`/`dq pc 128` show word-sized dumps with ASCII on the right.
 - `u` shows a `[u] 0x... count=...` header with disassembly lines.
 - `findmem -s hello -c 1` prints a match line with `base=... off=...` pointing into the sample binary.

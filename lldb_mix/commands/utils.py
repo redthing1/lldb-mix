@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from lldb_mix.core.modules import module_fullpath as _module_fullpath
+
 
 def emit_result(result, message: str, lldb_module) -> None:
     try:
@@ -10,27 +12,7 @@ def emit_result(result, message: str, lldb_module) -> None:
 
 
 def module_fullpath(module) -> str:
-    if not module:
-        return ""
-    try:
-        file_obj = getattr(module, "file", None)
-        if file_obj:
-            path = getattr(file_obj, "fullpath", "") or ""
-            if path:
-                return path
-    except Exception:
-        pass
-
-    try:
-        spec = module.GetFileSpec()
-    except Exception:
-        return ""
-
-    filename = _filespec_get_filename(spec)
-    directory = _filespec_get_directory(spec)
-    if directory and filename:
-        return f"{directory}/{filename}"
-    return filename or ""
+    return _module_fullpath(module)
 
 
 def parse_int(text: str) -> int | None:
@@ -77,6 +59,12 @@ def eval_expression(frame, expr: str) -> int | None:
     if not value or not value.IsValid():
         return None
     try:
+        error = value.GetError()
+        if error and not error.Success():
+            return None
+    except Exception:
+        pass
+    try:
         return int(value.GetValueAsUnsigned())
     except Exception:
         try:
@@ -92,21 +80,3 @@ def _pick_reg(candidates: tuple[str, ...], regs: dict[str, int]) -> int | None:
         if value:
             return value
     return None
-
-
-def _filespec_get_filename(spec) -> str:
-    if not spec:
-        return ""
-    try:
-        return spec.GetFilename() or ""
-    except Exception:
-        return ""
-
-
-def _filespec_get_directory(spec) -> str:
-    if not spec:
-        return ""
-    try:
-        return spec.GetDirectory() or ""
-    except Exception:
-        return ""

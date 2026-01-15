@@ -72,11 +72,15 @@ class TestLldbIntegration(unittest.TestCase):
             "breakpoint set -n main",
             "run",
             "context",
+            "deref $sp",
             "watch add $sp stack",
             "sess save {session}",
             "dump sp 64",
             "u",
             "skip",
+            "patch nop $pc 1",
+            "patch list",
+            "patch restore $pc",
             "db pc 64",
             "dw pc 64",
             "dd pc 64",
@@ -89,16 +93,20 @@ class TestLldbIntegration(unittest.TestCase):
             "antidebug",
             "bp clear all",
             "sess load {session}",
+            "ret 0",
         ]
         output = self._run_lldb(commands)
 
         self.assertIn("[regs]", output)
         self.assertIn("[code]", output)
+        self.assertIn("[deref]", output)
         self.assertIn("[lldb-mix] watch", output)
         self.assertIn("[lldb-mix] session saved", output)
         self.assertIn("[dump]", output)
         self.assertIn("[u]", output)
         self.assertIn("[lldb-mix] skip", output)
+        self.assertIn("[lldb-mix] patch", output)
+        self.assertIn("[lldb-mix] patches:", output)
         self.assertIn("[db]", output)
         self.assertIn("[dw]", output)
         self.assertIn("[dd]", output)
@@ -110,6 +118,7 @@ class TestLldbIntegration(unittest.TestCase):
         self.assertIn("[findmem]", output)
         self.assertIn("[lldb-mix] antidebug", output)
         self.assertIn("[lldb-mix] session loaded", output)
+        self.assertIn("[lldb-mix] ret", output)
 
     def test_rr_command(self):
         output = self._run_lldb(["rr"])

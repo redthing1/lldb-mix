@@ -13,6 +13,9 @@ class ArchSpec:
     flags_reg: str | None = None
     special_regs: tuple[str, ...] = ()
     max_inst_bytes: int = 4
+    return_reg: str | None = None
+    nop_bytes: bytes = b""
+    break_bytes: bytes = b""
 
     def format_flags(self, value: int) -> str:
         return ""

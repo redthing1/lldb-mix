@@ -1,6 +1,6 @@
 import unittest
 
-from lldb_mix.commands.breakpoints import _find_module, _module_base
+from lldb_mix.core.modules import find_module, module_base
 
 
 class _FakeFileSpec:
@@ -74,7 +74,7 @@ class TestBreakpointsHelpers(unittest.TestCase):
             _FakeModule("libbar.dylib", "/opt"),
         ]
         target = _FakeTarget(modules)
-        self.assertIs(_find_module(target, "libbar.dylib"), modules[1])
+        self.assertIs(find_module(target, "libbar.dylib"), modules[1])
 
     def test_find_module_by_path(self):
         modules = [
@@ -82,25 +82,25 @@ class TestBreakpointsHelpers(unittest.TestCase):
             _FakeModule("libbar.dylib", "/opt"),
         ]
         target = _FakeTarget(modules)
-        self.assertIs(_find_module(target, "/tmp/libfoo.dylib"), modules[0])
+        self.assertIs(find_module(target, "/tmp/libfoo.dylib"), modules[0])
 
     def test_find_module_no_match(self):
         modules = [_FakeModule("libfoo.dylib", "/tmp")]
         target = _FakeTarget(modules)
-        self.assertIsNone(_find_module(target, "missing.dylib"))
+        self.assertIsNone(find_module(target, "missing.dylib"))
 
     def test_module_base_prefers_header(self):
         header = _FakeAddress(0x1234, valid=True)
         section = _FakeSection(0x9999, valid=True)
         module = _FakeModule("libfoo.dylib", "/tmp", header=header, section=section)
-        base = _module_base(_FakeTarget([]), module, _FakeLLDB)
+        base = module_base(_FakeTarget([]), module, _FakeLLDB)
         self.assertEqual(base, 0x1234)
 
     def test_module_base_falls_back_to_section(self):
         header = _FakeAddress(_FakeLLDB.LLDB_INVALID_ADDRESS, valid=True)
         section = _FakeSection(0x2000, valid=True)
         module = _FakeModule("libfoo.dylib", "/tmp", header=header, section=section)
-        base = _module_base(_FakeTarget([]), module, _FakeLLDB)
+        base = module_base(_FakeTarget([]), module, _FakeLLDB)
         self.assertEqual(base, 0x2000)
 
 

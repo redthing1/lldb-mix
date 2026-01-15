@@ -2,6 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from lldb_mix.core.modules import (
+    find_module,
+    module_base,
+    module_for_address,
+    module_fullpath,
+)
 from lldb_mix.deref import format_addr
 
 
@@ -89,9 +95,9 @@ def _apply_spec(target, spec: BreakpointSpec):
     if kind == "name" and spec.name:
         return target.BreakpointCreateByName(spec.name)
     if kind == "module_offset" and spec.module and spec.offset:
-        module = _find_module(target, spec.module)
+        module = find_module(target, spec.module)
         if module:
-            base = _module_base(target, module)
+            base = module_base(target, module)
             offset = _parse_int(spec.offset)
             if base is not None and offset is not None:
                 return target.BreakpointCreateByAddress(base + offset)
@@ -104,12 +110,12 @@ def _apply_spec(target, spec: BreakpointSpec):
 def _spec_for_address(
     target, addr: int, enabled: bool
 ) -> BreakpointSpec:
-    module = _module_for_address(target, addr)
+    module = module_for_address(target, addr)
     if module:
-        base = _module_base(target, module)
+        base = module_base(target, module)
         if base is not None and addr >= base:
             offset = addr - base
-            module_path = _module_fullpath(module)
+            module_path = module_fullpath(module)
             if module_path:
                 return BreakpointSpec(
                     kind="module_offset",
@@ -176,86 +182,6 @@ def _location_address(target, location) -> int | None:
     if addr in (invalid, 0xFFFFFFFFFFFFFFFF):
         return None
     return addr
-
-
-def _module_for_address(target, addr: int):
-    try:
-        import lldb
-    except Exception:
-        return None
-    try:
-        sbaddr = lldb.SBAddress(addr, target)
-        module = sbaddr.GetModule()
-        if module and module.IsValid():
-            return module
-    except Exception:
-        return None
-    return None
-
-
-def _find_module(target, token: str):
-    for module in target.module_iter():
-        spec = module.GetFileSpec()
-        filename = spec.GetFilename() if spec else ""
-        path = _module_fullpath(module)
-        if token == filename or token == path:
-            return module
-        if path and path.endswith(f"/{token}"):
-            return module
-    return None
-
-
-def _module_base(target, module) -> int | None:
-    invalid = 0xFFFFFFFFFFFFFFFF
-    try:
-        import lldb
-
-        invalid = getattr(lldb, "LLDB_INVALID_ADDRESS", invalid)
-    except Exception:
-        pass
-    header = module.GetObjectFileHeaderAddress()
-    if header and header.IsValid():
-        base = header.GetLoadAddress(target)
-        if base not in (invalid, 0xFFFFFFFFFFFFFFFF):
-            return base
-    section = module.GetSectionAtIndex(0)
-    if section and section.IsValid():
-        base = section.GetLoadAddress(target)
-        if base not in (invalid, 0xFFFFFFFFFFFFFFFF):
-            return base
-    return None
-
-
-def _module_fullpath(module) -> str:
-    if not module:
-        return ""
-    try:
-        spec = module.GetFileSpec()
-    except Exception:
-        return ""
-    return _filespec_path(spec)
-
-
-def _filespec_path(spec) -> str:
-    if not spec:
-        return ""
-    try:
-        path = spec.GetPath() or ""
-    except Exception:
-        path = ""
-    if path:
-        return path
-    try:
-        filename = spec.GetFilename() or ""
-    except Exception:
-        filename = ""
-    try:
-        directory = spec.GetDirectory() or ""
-    except Exception:
-        directory = ""
-    if directory and filename:
-        return f"{directory}/{filename}"
-    return filename
 
 
 def _format_hex(value: int) -> str:
