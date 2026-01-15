@@ -8,7 +8,7 @@ from lldb_mix.ui.ansi import strip_ansi
 
 
 class TestLldbIntegration(unittest.TestCase):
-    def test_context_command_emits_panes(self):
+    def _run_lldb(self, commands):
         lldb_path = shutil.which("lldb")
         cmake_path = shutil.which("cmake")
         if not lldb_path or not cmake_path:
@@ -42,16 +42,12 @@ class TestLldbIntegration(unittest.TestCase):
             if not os.path.isfile(binary):
                 raise unittest.SkipTest("sample binary not produced")
 
-            commands = [
-                f"command script import {loader}",
-                "breakpoint set -n main",
-                "run",
-                "context",
-                "dump sp 64",
-                "quit",
-            ]
+            full_commands = [f"command script import {loader}"] + list(commands)
+            if not any(cmd.strip() == "quit" for cmd in full_commands):
+                full_commands.append("quit")
+
             lldb_cmd = [lldb_path, "-b", binary]
-            for cmd in commands:
+            for cmd in full_commands:
                 lldb_cmd.extend(["-o", cmd])
 
             proc = subprocess.run(
@@ -65,9 +61,46 @@ class TestLldbIntegration(unittest.TestCase):
             if "attach failed" in output or "Not allowed to attach" in output:
                 raise unittest.SkipTest("debugger attach not permitted")
 
-            self.assertIn("[regs]", output)
-            self.assertIn("[code]", output)
-            self.assertIn("[dump]", output)
+            return output
+
+    def test_context_command_emits_panes(self):
+        commands = [
+            "breakpoint set -n main",
+            "run",
+            "context",
+            "dump sp 64",
+            "u",
+            "db pc 64",
+            "dw pc 64",
+            "dd pc 64",
+            "dq pc 128",
+            "bpm sample_basic 0",
+            "regions",
+            "bpt main",
+            "bpn",
+            "findmem -s hello -c 1",
+            "antidebug",
+        ]
+        output = self._run_lldb(commands)
+
+        self.assertIn("[regs]", output)
+        self.assertIn("[code]", output)
+        self.assertIn("[dump]", output)
+        self.assertIn("[u]", output)
+        self.assertIn("[db]", output)
+        self.assertIn("[dw]", output)
+        self.assertIn("[dd]", output)
+        self.assertIn("[dq]", output)
+        self.assertIn("[lldb-mix] bpm", output)
+        self.assertIn("START", output)
+        self.assertIn("[lldb-mix] bpt", output)
+        self.assertIn("[lldb-mix] bpn", output)
+        self.assertIn("[findmem]", output)
+        self.assertIn("[lldb-mix] antidebug", output)
+
+    def test_rr_command(self):
+        output = self._run_lldb(["rr"])
+        self.assertNotIn("[lldb-mix] rr failed", output)
 
 
 if __name__ == "__main__":

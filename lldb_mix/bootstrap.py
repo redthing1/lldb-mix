@@ -31,6 +31,12 @@ def init(debugger, internal_dict) -> None:
     try:
         debugger.HandleCommand("script import lldb_mix.commands.context")
         debugger.HandleCommand("script import lldb_mix.commands.dump")
+        debugger.HandleCommand("script import lldb_mix.commands.run")
+        debugger.HandleCommand("script import lldb_mix.commands.breakpoints")
+        debugger.HandleCommand("script import lldb_mix.commands.regions")
+        debugger.HandleCommand("script import lldb_mix.commands.disasm")
+        debugger.HandleCommand("script import lldb_mix.commands.search")
+        debugger.HandleCommand("script import lldb_mix.commands.antidebug")
     except Exception as exc:
         err(f"failed to import commands via lldb script: {exc}")
         return
@@ -43,6 +49,55 @@ def init(debugger, internal_dict) -> None:
     _register_command(
         debugger,
         "command script add -f lldb_mix.commands.dump.cmd_dump dump",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.dump.cmd_db db",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.dump.cmd_dw dw",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.dump.cmd_dd dd",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.dump.cmd_dq dq",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.disasm.cmd_u u",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.search.cmd_findmem findmem",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.run.cmd_rr rr",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.breakpoints.cmd_bpm bpm",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.breakpoints.cmd_bpt bpt",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.breakpoints.cmd_bpn bpn",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.regions.cmd_regions regions",
+    )
+    _register_command(debugger, "command alias -- vmmap regions")
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.antidebug.cmd_antidebug antidebug",
     )
 
     load_settings(SETTINGS)

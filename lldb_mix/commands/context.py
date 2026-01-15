@@ -8,7 +8,7 @@ from lldb_mix.core.snapshot import capture_snapshot
 from lldb_mix.core.state import SETTINGS
 from lldb_mix.core.stop_hooks import ensure_stop_hook, remove_stop_hook
 from lldb_mix.core.symbols import TargetSymbolResolver
-from lldb_mix.ui.theme import get_theme
+from lldb_mix.ui.theme import THEMES, get_theme
 
 
 _MANAGER: ContextManager | None = None
@@ -72,6 +72,8 @@ def _handle_subcommand(debugger, sub: str, rest: list[str]) -> str | None:
         return _handle_auto(debugger, rest)
     if sub == "layout":
         return _handle_layout(rest)
+    if sub == "theme":
+        return _handle_theme(rest)
     if sub == "save":
         return _handle_save()
     if sub == "load":
@@ -105,7 +107,8 @@ def _handle_layout(args: list[str]) -> str:
 
 def _usage() -> str:
     return (
-        "[lldb-mix] usage: context [auto on|off|status] | [layout <panes...>] | [save|load] | [help]"
+        "[lldb-mix] usage: context [auto on|off|status] | [layout <panes...>] | "
+        "[theme <name|list|status>] | [save|load] | [help]"
     )
 
 
@@ -119,3 +122,16 @@ def _handle_load() -> str:
     if load_settings(SETTINGS):
         return "[lldb-mix] settings loaded"
     return "[lldb-mix] no settings found"
+
+
+def _handle_theme(args: list[str]) -> str:
+    if not args or args[0] == "status":
+        return f"[lldb-mix] theme: {SETTINGS.theme}"
+    if args[0] == "list":
+        names = ", ".join(sorted(THEMES.keys()))
+        return f"[lldb-mix] themes: {names}"
+    name = args[0]
+    if name not in THEMES:
+        return f"[lldb-mix] unknown theme: {name}"
+    SETTINGS.theme = name
+    return f"[lldb-mix] theme set: {name}"

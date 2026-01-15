@@ -43,13 +43,20 @@ class CodePane(Pane):
             lines.append("(disassembly unavailable)")
             return lines
 
-        for inst in insts:
+        bytes_pad = 0
+        bytes_texts: list[str] = []
+        if ctx.settings.show_opcodes:
+            for inst in insts:
+                bytes_texts.append(" ".join(f"{b:02x}" for b in inst.bytes))
+            bytes_pad = max((len(text) for text in bytes_texts), default=0)
+
+        for idx, inst in enumerate(insts):
             prefix = "=>" if inst.address == pc else "  "
             addr_text = format_addr(inst.address, ptr_size)
             bytes_text = ""
             if ctx.settings.show_opcodes:
-                bytes_text = " ".join(f"{b:02x}" for b in inst.bytes)
-                bytes_text = f"{bytes_text:<24}" if bytes_text else ""
+                bytes_text = bytes_texts[idx]
+                bytes_text = f"{bytes_text:<{bytes_pad}}" if bytes_text else ""
 
             prefix_role = "pc_marker" if inst.address == pc else "muted"
             prefix_colored = self.style(ctx, prefix, prefix_role)
@@ -60,6 +67,7 @@ class CodePane(Pane):
             text = f"{prefix_colored} {addr_colored} "
             if bytes_colored:
                 text += bytes_colored
+                text += " "
             text += mnemonic_colored
             if inst.operands:
                 text += f" {inst.operands}"
