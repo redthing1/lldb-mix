@@ -20,6 +20,7 @@ class TestLldbIntegration(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             build_dir = os.path.join(tmpdir, "build")
+            session_path = os.path.join(tmpdir, "session.json")
             configure = subprocess.run(
                 [cmake_path, "-S", samples_dir, "-B", build_dir],
                 stdout=subprocess.PIPE,
@@ -42,7 +43,10 @@ class TestLldbIntegration(unittest.TestCase):
             if not os.path.isfile(binary):
                 raise unittest.SkipTest("sample binary not produced")
 
-            full_commands = [f"command script import {loader}"] + list(commands)
+            expanded = [
+                cmd.replace("{session}", session_path) for cmd in commands
+            ]
+            full_commands = [f"command script import {loader}"] + expanded
             if not any(cmd.strip() == "quit" for cmd in full_commands):
                 full_commands.append("quit")
 
@@ -68,8 +72,11 @@ class TestLldbIntegration(unittest.TestCase):
             "breakpoint set -n main",
             "run",
             "context",
+            "watch add $sp stack",
+            "sess save {session}",
             "dump sp 64",
             "u",
+            "skip",
             "db pc 64",
             "dw pc 64",
             "dd pc 64",
@@ -80,13 +87,18 @@ class TestLldbIntegration(unittest.TestCase):
             "bpn",
             "findmem -s hello -c 1",
             "antidebug",
+            "bp clear all",
+            "sess load {session}",
         ]
         output = self._run_lldb(commands)
 
         self.assertIn("[regs]", output)
         self.assertIn("[code]", output)
+        self.assertIn("[lldb-mix] watch", output)
+        self.assertIn("[lldb-mix] session saved", output)
         self.assertIn("[dump]", output)
         self.assertIn("[u]", output)
+        self.assertIn("[lldb-mix] skip", output)
         self.assertIn("[db]", output)
         self.assertIn("[dw]", output)
         self.assertIn("[dd]", output)
@@ -97,6 +109,7 @@ class TestLldbIntegration(unittest.TestCase):
         self.assertIn("[lldb-mix] bpn", output)
         self.assertIn("[findmem]", output)
         self.assertIn("[lldb-mix] antidebug", output)
+        self.assertIn("[lldb-mix] session loaded", output)
 
     def test_rr_command(self):
         output = self._run_lldb(["rr"])

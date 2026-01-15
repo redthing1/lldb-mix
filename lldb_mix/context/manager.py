@@ -6,9 +6,11 @@ from lldb_mix.context.panes.flow import FlowPane
 from lldb_mix.context.panes.regs import RegsPane
 from lldb_mix.context.panes.stack import StackPane
 from lldb_mix.context.panes.threads import ThreadsPane
+from lldb_mix.context.panes.watch import WatchPane
 from lldb_mix.context.types import PaneContext
 from lldb_mix.core.settings import Settings
 from lldb_mix.core.snapshot import ContextSnapshot
+from lldb_mix.core.state import WATCHLIST
 from lldb_mix.ui.terminal import get_terminal_size
 from lldb_mix.ui.theme import Theme
 
@@ -24,6 +26,7 @@ class ContextManager:
             "code": CodePane(),
             "flow": FlowPane(),
             "threads": ThreadsPane(),
+            "watch": WatchPane(),
         }
 
     def render(
@@ -44,6 +47,7 @@ class ContextManager:
             resolver=resolver,
             target=target,
             process=process,
+            watchlist=WATCHLIST,
             term_width=term_width,
             term_height=term_height,
         )

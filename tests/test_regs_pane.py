@@ -5,6 +5,7 @@ from lldb_mix.context.panes.regs import RegsPane
 from lldb_mix.context.types import PaneContext
 from lldb_mix.core.settings import Settings
 from lldb_mix.core.snapshot import ContextSnapshot
+from lldb_mix.core.watchlist import WatchList
 from lldb_mix.ui.theme import BASE_THEME
 
 
@@ -38,6 +39,7 @@ class TestRegsPane(unittest.TestCase):
             resolver=None,
             target=None,
             process=None,
+            watchlist=WatchList(),
             term_width=80,
             term_height=24,
         )

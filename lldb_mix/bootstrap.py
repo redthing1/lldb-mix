@@ -30,6 +30,7 @@ def init(debugger, internal_dict) -> None:
 
     try:
         debugger.HandleCommand("script import lldb_mix.commands.context")
+        debugger.HandleCommand("script import lldb_mix.commands.conf")
         debugger.HandleCommand("script import lldb_mix.commands.dump")
         debugger.HandleCommand("script import lldb_mix.commands.run")
         debugger.HandleCommand("script import lldb_mix.commands.breakpoints")
@@ -37,6 +38,10 @@ def init(debugger, internal_dict) -> None:
         debugger.HandleCommand("script import lldb_mix.commands.disasm")
         debugger.HandleCommand("script import lldb_mix.commands.search")
         debugger.HandleCommand("script import lldb_mix.commands.antidebug")
+        debugger.HandleCommand("script import lldb_mix.commands.skip")
+        debugger.HandleCommand("script import lldb_mix.commands.watch")
+        debugger.HandleCommand("script import lldb_mix.commands.bp")
+        debugger.HandleCommand("script import lldb_mix.commands.session")
     except Exception as exc:
         err(f"failed to import commands via lldb script: {exc}")
         return
@@ -46,6 +51,10 @@ def init(debugger, internal_dict) -> None:
         "command script add -f lldb_mix.commands.context.cmd_context context",
     )
     _register_command(debugger, "command alias -- ctx context")
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.conf.cmd_conf conf",
+    )
     _register_command(
         debugger,
         "command script add -f lldb_mix.commands.dump.cmd_dump dump",
@@ -98,6 +107,22 @@ def init(debugger, internal_dict) -> None:
     _register_command(
         debugger,
         "command script add -f lldb_mix.commands.antidebug.cmd_antidebug antidebug",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.skip.cmd_skip skip",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.watch.cmd_watch watch",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.bp.cmd_bp bp",
+    )
+    _register_command(
+        debugger,
+        "command script add -f lldb_mix.commands.session.cmd_session sess",
     )
 
     load_settings(SETTINGS)

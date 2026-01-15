@@ -8,6 +8,7 @@ from lldb_mix.core.disasm import Instruction
 from lldb_mix.core.symbols import SymbolInfo
 from lldb_mix.core.settings import Settings
 from lldb_mix.core.snapshot import ContextSnapshot
+from lldb_mix.core.watchlist import WatchList
 from lldb_mix.ui.theme import BASE_THEME
 
 
@@ -40,6 +41,7 @@ class TestCodePaneFormat(unittest.TestCase):
             resolver=None,
             target=object(),
             process=None,
+            watchlist=WatchList(),
             term_width=120,
             term_height=40,
         )
@@ -91,6 +93,7 @@ class TestCodePaneFormat(unittest.TestCase):
             resolver=None,
             target=object(),
             process=None,
+            watchlist=WatchList(),
             term_width=120,
             term_height=40,
         )
@@ -150,6 +153,7 @@ class TestCodePaneFormat(unittest.TestCase):
             resolver=_Resolver(),
             target=object(),
             process=None,
+            watchlist=WatchList(),
             term_width=120,
             term_height=40,
         )
