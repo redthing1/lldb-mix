@@ -91,12 +91,14 @@ lldb samples/build/sample_basic
 
 ### Manual Validation Notes
 
-- After `run`, the context output includes `[regs]`, `[stack]`, and `[code]` headers and registers appear in multiple columns.
+- After `run`, the context output includes a `[lldb-mix]` header, a separator line, and `[regs]`, `[stack]`, and `[code]` sections; registers appear in multiple columns.
+- On wider terminals, panes pack into two columns (for example, regs + stack) while the code pane stays full-width.
 - `conf list` prints available settings; `conf set theme base` switches without errors.
+- `conf set clear_screen on` clears the terminal before each context output.
 - `dump sp 64` shows a `[dump] 0x... len=64 width=16` header and four hexdump lines.
 - `skip` prints a `[lldb-mix] skip 1 -> 0x...` line and updates the PC.
 - `deref $sp` prints a `[deref]` header with region, symbol, and deref chain info.
-- After `watch add $sp`, the `[watch]` pane shows the watch entry when the layout includes `watch`.
+- After `watch add $sp`, the `[watch]` pane shows the watch entry when the layout includes `watch` (the pane hides when there are no watches).
 - `sess save` writes a session file and `sess load` restores watches and breakpoints.
 - `patch nop $pc 1` reports the patched address and `patch restore $pc` restores the original bytes.
 - `ret 0` returns from the current frame and prints a confirmation line.

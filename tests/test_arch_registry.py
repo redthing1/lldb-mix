@@ -8,19 +8,33 @@ from lldb_mix.arch.x64 import X64_ARCH
 class TestArchRegistry(unittest.TestCase):
     def test_detect_x64_from_triple(self):
         arch = detect_arch("x86_64-apple-darwin", [])
-        self.assertIs(arch, X64_ARCH)
+        self.assertEqual(arch.name, X64_ARCH.name)
+        self.assertIsNotNone(arch.abi)
+        self.assertEqual(arch.abi.name, "sysv")
+
+    def test_detect_x64_win64(self):
+        arch = detect_arch("x86_64-pc-windows-msvc", [])
+        self.assertEqual(arch.name, X64_ARCH.name)
+        self.assertIsNotNone(arch.abi)
+        self.assertEqual(arch.abi.name, "win64")
 
     def test_detect_arm64_from_triple(self):
         arch = detect_arch("arm64-apple-darwin", [])
-        self.assertIs(arch, ARM64_ARCH)
+        self.assertEqual(arch.name, ARM64_ARCH.name)
+        self.assertIsNotNone(arch.abi)
+        self.assertEqual(arch.abi.name, "aapcs64")
 
     def test_detect_x64_from_regs(self):
         arch = detect_arch("", ["rax", "rip", "rsp"])
-        self.assertIs(arch, X64_ARCH)
+        self.assertEqual(arch.name, X64_ARCH.name)
+        self.assertIsNotNone(arch.abi)
+        self.assertEqual(arch.abi.name, "sysv")
 
     def test_detect_arm64_from_regs(self):
         arch = detect_arch("", ["x0", "x1", "sp", "pc"])
-        self.assertIs(arch, ARM64_ARCH)
+        self.assertEqual(arch.name, ARM64_ARCH.name)
+        self.assertIsNotNone(arch.abi)
+        self.assertEqual(arch.abi.name, "aapcs64")
 
 
 if __name__ == "__main__":

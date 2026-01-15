@@ -287,6 +287,14 @@ _SPECS: list[SettingSpec] = [
         validate=_is_bool,
     ),
     SettingSpec(
+        key="clear_screen",
+        attr="clear_screen",
+        type_name="bool",
+        parse=_parse_bool,
+        format=_fmt_bool,
+        validate=_is_bool,
+    ),
+    SettingSpec(
         key="stack_lines",
         attr="stack_lines",
         type_name="int",

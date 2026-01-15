@@ -12,6 +12,7 @@ class Settings:
     max_deref_depth: int = 6
     max_string_length: int = 64
     auto_context: bool = True
+    clear_screen: bool = False
     stack_lines: int = 8
     stack_frame_lines: int = 2
     memory_window_bytes: int = 64

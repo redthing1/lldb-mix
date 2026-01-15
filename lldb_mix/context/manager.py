@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from lldb_mix.context.header import render_header
+from lldb_mix.context.layout import layout_panes, render_rows
 from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.panes.code import CodePane
 from lldb_mix.context.panes.flow import FlowPane
@@ -11,7 +13,7 @@ from lldb_mix.context.types import PaneContext
 from lldb_mix.core.settings import Settings
 from lldb_mix.core.snapshot import ContextSnapshot
 from lldb_mix.core.state import WATCHLIST
-from lldb_mix.ui.terminal import get_terminal_size
+from lldb_mix.ui.terminal import clear_screen_code, get_terminal_size
 from lldb_mix.ui.theme import Theme
 
 
@@ -52,13 +54,22 @@ class ContextManager:
             term_height=term_height,
         )
         lines: list[str] = []
+        header_lines = render_header(ctx)
+        if self.settings.clear_screen and header_lines:
+            header_lines[0] = clear_screen_code() + header_lines[0]
+        lines.extend(header_lines)
+
+        panes: list[Pane] = []
         for pane_name in self.settings.layout:
             pane = self.panes.get(pane_name)
             if not pane:
                 continue
-            if lines:
-                lines.append("")
-            lines.extend(pane.render(ctx))
+            if pane_name == "watch" and not WATCHLIST.items():
+                continue
+            panes.append(pane)
+
+        rows = layout_panes(panes, term_width)
+        lines.extend(render_rows(rows, ctx))
         self.last_regs = dict(snapshot.regs)
         return lines
 

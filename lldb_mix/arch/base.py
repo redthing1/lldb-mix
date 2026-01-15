@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from lldb_mix.arch.abi import AbiSpec
+
 
 @dataclass(frozen=True)
 class ArchSpec:
@@ -16,6 +18,8 @@ class ArchSpec:
     return_reg: str | None = None
     nop_bytes: bytes = b""
     break_bytes: bytes = b""
+    abi: AbiSpec | None = None
+    call_mnemonics: tuple[str, ...] = ()
 
     def format_flags(self, value: int) -> str:
         return ""
@@ -28,6 +32,12 @@ class ArchSpec:
         _ = mnemonic
         _ = flags
         return False, ""
+
+    def is_call(self, mnemonic: str) -> bool:
+        mnem = mnemonic.lower()
+        if self.call_mnemonics:
+            return mnem in self.call_mnemonics
+        return mnem.startswith("call")
 
 
 UNKNOWN_ARCH = ArchSpec(

@@ -147,4 +147,5 @@ X64_ARCH = X64Arch(
     return_reg="rax",
     nop_bytes=b"\x90",
     break_bytes=b"\xcc",
+    call_mnemonics=("call", "callq"),
 )

@@ -6,6 +6,7 @@ from lldb_mix.ui.style import colorize
 
 class Pane:
     name = ""
+    full_width = False
 
     def title(self, ctx: PaneContext | None = None) -> str:
         text = f"[{self.name}]"
