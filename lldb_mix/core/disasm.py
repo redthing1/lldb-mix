@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from lldb_mix.arch.view import ArchView
+from lldb_mix.core.memory import MemoryRegion
 
 
 @dataclass(frozen=True)
@@ -64,6 +65,7 @@ def read_instructions_around(
     before: int,
     after: int,
     arch: ArchView,
+    regions: list[MemoryRegion] | None = None,
     flavor: str = "intel",
 ) -> list[Instruction]:
     total = before + after + 1
@@ -77,6 +79,12 @@ def read_instructions_around(
     start = pc - (before * max_inst)
     if start < 0:
         start = 0
+    if regions:
+        region = next((region for region in regions if region.contains(pc)), None)
+        if region and start < region.start:
+            start = region.start
+            if start > pc:
+                return read_instructions(target, pc, total, flavor)
 
     fetch_count = total + before * 3
     insts = read_instructions(target, start, fetch_count, flavor)

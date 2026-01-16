@@ -58,6 +58,7 @@ class CodePane(Pane):
             ctx.settings.code_lines_before,
             ctx.settings.code_lines_after,
             arch,
+            regions=snapshot.maps,
             flavor=flavor,
         )
         if not insts:
