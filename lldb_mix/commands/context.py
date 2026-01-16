@@ -36,6 +36,25 @@ def render_context(debugger) -> str:
     return "\n".join(lines)
 
 
+def render_context_if_enabled(debugger) -> str | None:
+    if not SETTINGS.auto_context:
+        return None
+    session = Session(debugger)
+    process = session.process()
+    if not process:
+        return None
+    try:
+        import lldb
+    except Exception:
+        return None
+    state = process.GetState()
+    if state not in (lldb.eStateStopped, lldb.eStateCrashed, lldb.eStateSuspended):
+        return None
+    if not session.frame():
+        return None
+    return render_context(debugger)
+
+
 def cmd_context(debugger, command, result, internal_dict) -> None:
     try:
         import lldb

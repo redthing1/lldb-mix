@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shlex
 
+from lldb_mix.commands.context import render_context_if_enabled
 from lldb_mix.commands.utils import emit_result
 from lldb_mix.core.breakpoints import clear_breakpoints
 from lldb_mix.core.session import Session
@@ -82,10 +83,14 @@ def _handle_load(debugger, args: list[str]) -> str:
         clear_breakpoints(target)
     WATCHLIST.clear()
     bp_count, watch_count = apply_session(target, WATCHLIST, data)
-    return (
+    message = (
         f"[lldb-mix] session loaded from {path} "
         f"(bps={bp_count}, watches={watch_count})"
     )
+    context_text = render_context_if_enabled(debugger)
+    if context_text:
+        message = f"{message}\n{context_text}"
+    return message
 
 
 def _handle_list() -> str:

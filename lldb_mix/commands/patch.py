@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shlex
 
+from lldb_mix.commands.context import render_context_if_enabled
 from lldb_mix.commands.utils import (
     emit_result,
     eval_expression,
@@ -60,11 +61,13 @@ def cmd_patch(debugger, command, result, internal_dict) -> None:
             emit_result(result, "[lldb-mix] patch restore failed", lldb)
             return
         PATCHES.remove(addr)
-        emit_result(
-            result,
-            f"[lldb-mix] patch restored {format_addr(addr, ptr_size)} len={entry.size}",
-            lldb,
+        message = (
+            f"[lldb-mix] patch restored {format_addr(addr, ptr_size)} len={entry.size}"
         )
+        context_text = render_context_if_enabled(debugger)
+        if context_text:
+            message = f"{message}\n{context_text}"
+        emit_result(result, message, lldb)
         return
 
     addr, count, payload, error = _parse_patch_args(subcmd, args[1:], regs, frame, arch)
@@ -96,6 +99,9 @@ def cmd_patch(debugger, command, result, internal_dict) -> None:
     )
     if count > 1 and subcmd in ("nop", "int3", "null"):
         summary += f" count={count}"
+    context_text = render_context_if_enabled(debugger)
+    if context_text:
+        summary = f"{summary}\n{context_text}"
     emit_result(result, summary, lldb)
 
 

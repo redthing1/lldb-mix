@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shlex
 
+from lldb_mix.commands.context import render_context_if_enabled
 from lldb_mix.commands.utils import emit_result, parse_int
 from lldb_mix.core.state import WATCHLIST
 
@@ -24,24 +25,34 @@ def cmd_watch(debugger, command, result, internal_dict) -> None:
         emit_result(result, _usage(), lldb)
         return
     if sub == "add":
-        emit_result(result, _handle_add(rest), lldb)
+        if not rest:
+            emit_result(result, _usage(), lldb)
+            return
+        message = _handle_add(rest)
+        _emit_with_context(result, debugger, message, lldb, True)
         return
     if sub in ("del", "rm", "remove"):
-        emit_result(result, _handle_del(rest), lldb)
+        if len(rest) != 1:
+            emit_result(result, _usage(), lldb)
+            return
+        message, changed = _handle_del(rest)
+        _emit_with_context(result, debugger, message, lldb, changed)
         return
     if sub == "list":
         emit_result(result, _handle_list(), lldb)
         return
     if sub == "clear":
-        emit_result(result, _handle_clear(), lldb)
+        if rest:
+            emit_result(result, _usage(), lldb)
+            return
+        message, changed = _handle_clear()
+        _emit_with_context(result, debugger, message, lldb, changed)
         return
 
     emit_result(result, f"[lldb-mix] unknown watch subcommand: {sub}\n{_usage()}", lldb)
 
 
 def _handle_add(args: list[str]) -> str:
-    if not args:
-        return _usage()
     expr = args[0]
     label = " ".join(args[1:]) if len(args) > 1 else None
     entry = WATCHLIST.add(expr, label)
@@ -50,15 +61,13 @@ def _handle_add(args: list[str]) -> str:
     return f"[lldb-mix] watch #{entry.wid} added: {expr}"
 
 
-def _handle_del(args: list[str]) -> str:
-    if len(args) != 1:
-        return _usage()
-    wid = parse_int(args[0])
+def _handle_del(args: list[str]) -> tuple[str, bool]:
+    wid = parse_int(args[0]) if args else None
     if wid is None or wid <= 0:
-        return "[lldb-mix] invalid watch id"
+        return "[lldb-mix] invalid watch id", False
     if WATCHLIST.remove(wid):
-        return f"[lldb-mix] watch #{wid} removed"
-    return f"[lldb-mix] watch #{wid} not found"
+        return f"[lldb-mix] watch #{wid} removed", True
+    return f"[lldb-mix] watch #{wid} not found", False
 
 
 def _handle_list() -> str:
@@ -72,10 +81,24 @@ def _handle_list() -> str:
     return "\n".join(lines)
 
 
-def _handle_clear() -> str:
+def _handle_clear() -> tuple[str, bool]:
+    had_items = bool(WATCHLIST.items())
     WATCHLIST.clear()
-    return "[lldb-mix] watches cleared"
+    return "[lldb-mix] watches cleared", had_items
 
 
 def _usage() -> str:
     return "[lldb-mix] usage: watch add <expr> [label] | del <id> | list | clear"
+
+
+def _emit_with_context(
+    result,
+    debugger,
+    message: str,
+    lldb_module,
+    changed: bool,
+) -> None:
+    context_text = render_context_if_enabled(debugger) if changed else None
+    if context_text:
+        message = f"{message}\n{context_text}"
+    emit_result(result, message, lldb_module)

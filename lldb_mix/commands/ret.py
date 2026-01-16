@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shlex
 
+from lldb_mix.commands.context import render_context_if_enabled
 from lldb_mix.commands.utils import emit_result, eval_expression, parse_int
 from lldb_mix.core.session import Session
 
@@ -59,6 +60,9 @@ def cmd_ret(debugger, command, result, internal_dict) -> None:
     message = "[lldb-mix] ret"
     if value_text:
         message += f" value={value_text}"
+    context_text = render_context_if_enabled(debugger)
+    if context_text:
+        message = f"{message}\n{context_text}"
     emit_result(result, message, lldb)
 
 
