@@ -173,7 +173,5 @@ def init(debugger, internal_dict) -> None:
     else:
         restore_defaults(debugger)
     if SETTINGS.auto_context:
-        target = debugger.GetSelectedTarget()
-        if target and target.IsValid():
-            ensure_stop_hook(debugger, "context")
+        ensure_stop_hook(debugger, "context")
     banner(f"loaded ({version.variant} lldb-{version.major}.{version.minor})")
