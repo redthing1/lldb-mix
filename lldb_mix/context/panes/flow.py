@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.types import PaneContext
-from lldb_mix.core.disasm import read_instructions
+from lldb_mix.core.disasm import disasm_flavor, read_instructions
 from lldb_mix.core.flow import is_branch_like, resolve_flow_target
 from lldb_mix.deref import format_addr, format_symbol
 
@@ -61,7 +61,7 @@ def _current_inst(ctx: PaneContext):
     pc = ctx.snapshot.pc
     if pc == 0 or not ctx.target:
         return None
-    flavor = "intel" if ctx.snapshot.arch.name.startswith("x86") else ""
+    flavor = disasm_flavor(ctx.snapshot.arch.name)
     try:
         insts = read_instructions(ctx.target, pc, 1, flavor)
     except Exception:

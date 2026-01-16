@@ -45,6 +45,10 @@ class Arm64Arch(ArchSpec):
     def is_conditional_branch(self, mnemonic: str) -> bool:
         return mnemonic.lower().startswith("b.")
 
+    def is_unconditional_branch(self, mnemonic: str) -> bool:
+        mnem = mnemonic.lower()
+        return mnem in {"b", "br"}
+
     def branch_taken(self, mnemonic: str, flags: int) -> tuple[bool, str]:
         mnem = mnemonic.lower()
         if not mnem.startswith("b."):

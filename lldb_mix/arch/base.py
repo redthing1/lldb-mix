@@ -28,6 +28,10 @@ class ArchSpec:
         _ = mnemonic
         return False
 
+    def is_unconditional_branch(self, mnemonic: str) -> bool:
+        _ = mnemonic
+        return False
+
     def branch_taken(self, mnemonic: str, flags: int) -> tuple[bool, str]:
         _ = mnemonic
         _ = flags

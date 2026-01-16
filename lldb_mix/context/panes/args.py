@@ -1,18 +1,11 @@
 from __future__ import annotations
 
+from lldb_mix.context.formatting import deref_summary, format_deref_suffix
 from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.types import PaneContext
-from lldb_mix.core.disasm import read_instructions
+from lldb_mix.core.disasm import disasm_flavor, read_instructions
 from lldb_mix.core.flow import resolve_flow_target
-from lldb_mix.deref import (
-    classify_token,
-    deref_chain,
-    format_addr,
-    format_symbol,
-    last_addr,
-    region_tag,
-    summarize_chain,
-)
+from lldb_mix.deref import format_addr, format_symbol
 
 
 class ArgsPane(Pane):
@@ -66,29 +59,9 @@ class ArgsPane(Pane):
             sep = self.style(ctx, ": ", "label")
             line = f"{name_colored}{sep}{value_colored}"
 
-            if ctx.settings.aggressive_deref and ctx.reader:
-                chain = deref_chain(
-                    value,
-                    ctx.reader,
-                    snapshot.maps,
-                    ctx.resolver,
-                    ctx.settings,
-                    ptr_size,
-                )
-                summary = summarize_chain(chain)
-                if summary:
-                    kind = classify_token(summary)
-                    role = "string" if kind == "string" else "symbol"
-                    if kind == "region":
-                        role = "muted"
-                    arrow = self.style(ctx, "->", "arrow")
-                    summary_text = self.style(ctx, summary, role)
-                    line = f"{line} {arrow} {summary_text}"
-                    if kind == "symbol":
-                        tag = region_tag(last_addr(chain), snapshot.maps)
-                        if tag:
-                            tag_text = self.style(ctx, tag, "muted")
-                            line = f"{line} {tag_text}"
+            info = deref_summary(ctx, value, ptr_size)
+            if info:
+                line = f"{line} {format_deref_suffix(self, ctx, info)}"
 
             lines.append(line)
 
@@ -121,7 +94,7 @@ class ArgsPane(Pane):
 def _current_call_inst(ctx: PaneContext, arch, pc: int):
     if not ctx.target or pc == 0:
         return None
-    flavor = "intel" if arch.name.startswith("x86") else ""
+    flavor = disasm_flavor(arch.name)
     try:
         insts = read_instructions(ctx.target, pc, 1, flavor)
     except Exception:

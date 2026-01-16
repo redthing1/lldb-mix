@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import re
 from dataclasses import replace
 
 from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.types import PaneContext
-from lldb_mix.ui.ansi import RESET, strip_ansi
+from lldb_mix.ui.text import pad_ansi, truncate_ansi
 
 COLUMN_GAP = 2
 MIN_COLUMN_WIDTH = 60
@@ -116,7 +115,7 @@ def _render_column(panes: list[Pane], ctx: PaneContext, col_width: int) -> list[
 def _render_pane(pane: Pane, ctx: PaneContext, width: int) -> list[str]:
     sub_ctx = replace(ctx, term_width=width)
     pane_lines = pane.render(sub_ctx)
-    return [_pad_line(_truncate_ansi(line, width), width) for line in pane_lines]
+    return [pad_ansi(truncate_ansi(line, width), width) for line in pane_lines]
 
 
 def _join_columns(blocks: list[list[str]], col_width: int) -> list[str]:
@@ -146,47 +145,3 @@ def _assign_column(columns: dict[int, list[Pane]]) -> int:
 def _has_column_hints(group: list[Pane]) -> bool:
     return any(pane.column is not None for pane in group)
 
-
-def _visible_len(text: str) -> int:
-    return len(strip_ansi(text))
-
-
-def _pad_line(text: str, width: int) -> str:
-    length = _visible_len(text)
-    if length >= width:
-        return text
-    return text + (" " * (width - length))
-
-
-_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-
-
-def _truncate_ansi(text: str, width: int) -> str:
-    if width <= 0:
-        return ""
-    plain = strip_ansi(text)
-    if len(plain) <= width:
-        return text
-    if width <= 3:
-        return plain[:width]
-
-    target = width - 3
-    out: list[str] = []
-    visible = 0
-    idx = 0
-    had_ansi = False
-    while idx < len(text) and visible < target:
-        if text[idx] == "\x1b":
-            match = _ANSI_RE.match(text, idx)
-            if match:
-                out.append(match.group(0))
-                had_ansi = True
-                idx = match.end()
-                continue
-        out.append(text[idx])
-        visible += 1
-        idx += 1
-    out.append("...")
-    if had_ansi:
-        out.append(RESET)
-    return "".join(out)

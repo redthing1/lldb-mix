@@ -4,7 +4,7 @@ import shlex
 
 from lldb_mix.commands.utils import emit_result, eval_expression, resolve_addr
 from lldb_mix.core.modules import find_module, module_base, module_name
-from lldb_mix.core.disasm import read_instructions
+from lldb_mix.core.disasm import disasm_flavor, read_instructions
 from lldb_mix.core.session import Session
 from lldb_mix.core.snapshot import capture_snapshot
 from lldb_mix.deref import format_addr
@@ -149,7 +149,7 @@ def cmd_bpn(debugger, command, result, internal_dict) -> None:
         emit_result(result, "[lldb-mix] bpn pc unavailable", lldb)
         return
 
-    flavor = "intel" if snapshot.arch.name.startswith("x86") else ""
+    flavor = disasm_flavor(snapshot.arch.name)
     insts = read_instructions(target, pc, 1, flavor=flavor)
     size = len(insts[0].bytes) if insts else snapshot.arch.max_inst_bytes
     if size <= 0:

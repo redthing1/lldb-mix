@@ -4,7 +4,7 @@ import shlex
 
 from lldb_mix.commands.context import render_context_if_enabled
 from lldb_mix.commands.utils import emit_result, parse_int
-from lldb_mix.core.disasm import read_instructions
+from lldb_mix.core.disasm import disasm_flavor, read_instructions
 from lldb_mix.core.session import Session
 from lldb_mix.core.snapshot import capture_snapshot
 from lldb_mix.deref import format_addr
@@ -44,7 +44,7 @@ def cmd_skip(debugger, command, result, internal_dict) -> None:
         emit_result(result, "[lldb-mix] pc unavailable", lldb)
         return
 
-    flavor = "intel" if snapshot.arch.name.startswith("x86") else ""
+    flavor = disasm_flavor(snapshot.arch.name)
     insts = read_instructions(target, pc, count, flavor=flavor)
     target_addr = _compute_target(pc, insts, count)
     if target_addr is None:

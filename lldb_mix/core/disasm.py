@@ -14,6 +14,13 @@ class Instruction:
     operands: str
 
 
+def disasm_flavor(arch_name: str | None) -> str:
+    name = (arch_name or "").lower()
+    if name.startswith("x86") or name in {"x64", "amd64", "i386"}:
+        return "intel"
+    return ""
+
+
 def read_instructions(
     target: Any, addr: int, count: int, flavor: str = "intel"
 ) -> list[Instruction]:

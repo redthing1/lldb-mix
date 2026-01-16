@@ -4,7 +4,7 @@ import shlex
 import struct
 
 from lldb_mix.commands.utils import emit_result
-from lldb_mix.core.disasm import read_instructions
+from lldb_mix.core.disasm import disasm_flavor, read_instructions
 from lldb_mix.core.session import Session
 
 
@@ -115,7 +115,7 @@ def antidebug_callback_step1(frame, bp_loc, internal_dict):
         if oldp:
             ANTIDEBUG_SYSCTL_OLDP.append(oldp)
             pc = frame.GetPC()
-            flavor = "intel" if arch == "x64" else ""
+            flavor = disasm_flavor(arch)
             insts = read_instructions(target, pc, 64, flavor=flavor)
             for inst in insts:
                 if inst.mnemonic.lower().startswith("ret"):

@@ -1,17 +1,13 @@
 from __future__ import annotations
 
+from lldb_mix.context.formatting import (
+    DerefSummary,
+    deref_summary,
+    format_deref_suffix,
+)
 from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.types import PaneContext
-from lldb_mix.deref import (
-    classify_token,
-    deref_chain,
-    format_addr,
-    format_region,
-    last_addr,
-    find_region,
-    region_tag,
-    summarize_chain,
-)
+from lldb_mix.deref import find_region, format_addr, format_region
 
 
 class RegsPane(Pane):
@@ -35,7 +31,7 @@ class RegsPane(Pane):
 
         name_width = max(len(name) for name in reg_names)
         entries: list[tuple[str, int]] = []
-        pointers: list[tuple[str, str, str, str | None]] = []
+        pointers: list[tuple[str, DerefSummary]] = []
 
         for reg_name in reg_names:
             value = regs[reg_name]
@@ -56,36 +52,18 @@ class RegsPane(Pane):
             entries.append((cell_text, len(cell_plain)))
 
             if not is_flags and ctx.settings.aggressive_deref and ctx.reader:
-                chain = deref_chain(
-                    value,
-                    ctx.reader,
-                    snapshot.maps,
-                    ctx.resolver,
-                    ctx.settings,
-                    ptr_size,
-                )
-                summary = summarize_chain(chain)
-                if summary:
-                    kind = classify_token(summary)
-                    if kind in ("string", "symbol", "region"):
-                        addr = last_addr(chain)
-                        tag = None
-                        if kind == "symbol":
-                            tag = region_tag(addr, snapshot.maps)
-                        pointers.append((reg_name, summary, kind, tag))
-                    elif show_all:
-                        region = find_region(value, snapshot.maps)
-                        if region:
-                            tag = format_region(region)
-                            pointers.append(
-                                (reg_name, format_addr(value, ptr_size), "addr", tag)
-                            )
+                info = deref_summary(ctx, value, ptr_size)
+                if info:
+                    pointers.append((reg_name, info))
                 elif show_all:
                     region = find_region(value, snapshot.maps)
                     if region:
                         tag = format_region(region)
                         pointers.append(
-                            (reg_name, format_addr(value, ptr_size), "addr", tag)
+                            (
+                                reg_name,
+                                DerefSummary(format_addr(value, ptr_size), "addr", tag),
+                            )
                         )
 
         cell_width = max(length for _, length in entries)
@@ -104,23 +82,13 @@ class RegsPane(Pane):
             lines.append(self.style(ctx, "pointers:", "label"))
             pointer_name_width = max(len(reg_name) for reg_name, *_ in pointers)
             indent = "  "
-            for reg_name, summary, kind, tag in pointers:
-                role = "string" if kind == "string" else "symbol"
-                if kind == "region":
-                    role = "muted"
-                if kind == "addr":
-                    role = "addr"
+            for reg_name, info in pointers:
                 reg_text = self.style(
                     ctx,
                     f"{reg_name:<{pointer_name_width}}",
                     "reg_name",
                 )
-                arrow = self.style(ctx, "->", "arrow")
-                summary_text = self.style(ctx, summary, role)
-                line = f"{indent}{reg_text} {arrow} {summary_text}"
-                if tag:
-                    tag_text = self.style(ctx, tag, "muted")
-                    line = f"{line} {tag_text}"
+                line = f"{indent}{reg_text} {format_deref_suffix(self, ctx, info)}"
                 lines.append(line)
 
         return lines

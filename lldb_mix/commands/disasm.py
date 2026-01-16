@@ -9,7 +9,7 @@ from lldb_mix.commands.utils import (
     parse_int,
     resolve_addr,
 )
-from lldb_mix.core.disasm import read_instructions
+from lldb_mix.core.disasm import disasm_flavor, read_instructions
 from lldb_mix.core.session import Session
 from lldb_mix.core.snapshot import capture_snapshot
 from lldb_mix.core.state import SETTINGS
@@ -50,7 +50,7 @@ def cmd_u(debugger, command, result, internal_dict) -> None:
         emit_result(result, "[lldb-mix] u address is 0", lldb)
         return
 
-    flavor = "intel" if snapshot.arch.name.startswith("x86") else ""
+    flavor = disasm_flavor(snapshot.arch.name)
     insts = read_instructions(target, addr, count, flavor=flavor)
     if not insts:
         emit_result(result, "[lldb-mix] disassembly unavailable", lldb)

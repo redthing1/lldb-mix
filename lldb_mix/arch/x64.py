@@ -72,6 +72,9 @@ class X64Arch(ArchSpec):
     def is_conditional_branch(self, mnemonic: str) -> bool:
         return mnemonic.lower() in _COND_MNEMONICS
 
+    def is_unconditional_branch(self, mnemonic: str) -> bool:
+        return mnemonic.lower().startswith("jmp")
+
     def branch_taken(self, mnemonic: str, flags: int) -> tuple[bool, str]:
         mnem = mnemonic.lower()
         cf = bool(flags & (1 << _FLAG_BITS["cf"]))
