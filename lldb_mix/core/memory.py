@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional
-
-RegionKey = tuple[int, int, bool, bool, bool, Optional[str]]
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -54,101 +52,35 @@ def read_memory_regions(process: Any) -> list[MemoryRegion]:
     if not process or not process.IsValid():
         return []
 
-    output = _regions_from_list(process, lldb)
-    if output:
-        return output
-    return _fallback_memory_regions(process, lldb)
-
-
-def _fallback_memory_regions(process: Any, lldb_module: Any) -> list[MemoryRegion]:
-    # gdb-remote often returns empty region lists even when per-address queries work.
-    output: list[MemoryRegion] = []
-    seen: set[RegionKey] = set()
-    info = lldb_module.SBMemoryRegionInfo()
-    for addr in _seed_region_addrs(process, lldb_module):
-        if not _query_region_info(process, addr, info, lldb_module):
-            continue
-        _append_region(output, seen, info, lldb_module)
-    output.sort(key=lambda region: region.start)
-    return output
-
-
-def _regions_from_list(process: Any, lldb_module: Any) -> list[MemoryRegion]:
     regions = process.GetMemoryRegions()
     if not regions or regions.GetSize() == 0:
         return []
     output: list[MemoryRegion] = []
-    seen: set[RegionKey] = set()
-    info = lldb_module.SBMemoryRegionInfo()
+    info = lldb.SBMemoryRegionInfo()
     for idx in range(regions.GetSize()):
         if not regions.GetMemoryRegionAtIndex(idx, info):
             continue
-        _append_region(output, seen, info, lldb_module)
+        region = _region_from_info(info, lldb)
+        if region:
+            output.append(region)
     return output
 
 
-def _seed_region_addrs(process: Any, lldb_module: Any) -> list[int]:
-    seeds: set[int] = set()
-    target = process.GetTarget() if process else None
-    if target and target.IsValid():
-        for idx in range(target.GetNumModules()):
-            module = target.GetModuleAtIndex(idx)
-            if not module or not module.IsValid():
-                continue
-            for sec_idx in range(module.GetNumSections()):
-                _collect_section_addrs(
-                    module.GetSectionAtIndex(sec_idx),
-                    target,
-                    seeds,
-                    lldb_module,
-                )
-
-    thread = process.GetSelectedThread() if process else None
-    if thread and thread.IsValid():
-        frame = thread.GetFrameAtIndex(0)
-        if frame and frame.IsValid():
-            for addr in (frame.GetPC(), frame.GetSP(), frame.GetFP()):
-                if addr != lldb_module.LLDB_INVALID_ADDRESS:
-                    seeds.add(addr)
-    return sorted(seeds)
+def regions_unavailable_message(process: Any) -> str:
+    plugin = _process_plugin_name(process)
+    if "gdb-remote" in plugin:
+        return "[lldb-mix] no memory regions (gdb-remote)"
+    return "[lldb-mix] no memory regions"
 
 
-def _collect_section_addrs(section: Any, target: Any, seeds: set[int], lldb_module: Any) -> None:
-    if not section or not section.IsValid():
-        return
-    addr = section.GetLoadAddress(target)
-    if addr != lldb_module.LLDB_INVALID_ADDRESS:
-        seeds.add(addr)
-    for idx in range(section.GetNumSubSections()):
-        _collect_section_addrs(section.GetSubSectionAtIndex(idx), target, seeds, lldb_module)
-
-
-def _query_region_info(process: Any, addr: int, info: Any, lldb_module: Any) -> bool:
+def _process_plugin_name(process: Any) -> str:
+    if not process:
+        return ""
     try:
-        result = process.GetMemoryRegionInfo(addr, info)
+        name = process.GetPluginName()
     except Exception:
-        return False
-    if hasattr(result, "Success"):
-        return result.Success()
-    if isinstance(result, bool):
-        return result
-    return False
-
-
-def _append_region(
-    output: list[MemoryRegion],
-    seen: set[RegionKey],
-    info: Any,
-    lldb_module: Any,
-) -> None:
-    region = _region_from_info(info, lldb_module)
-    if not region:
-        return
-    key = _region_key(region)
-    if key in seen:
-        return
-    seen.add(key)
-    output.append(region)
+        return ""
+    return (name or "").lower()
 
 
 def _region_from_info(info: Any, lldb_module: Any) -> MemoryRegion | None:
@@ -172,15 +104,4 @@ def _region_from_info(info: Any, lldb_module: Any) -> MemoryRegion | None:
         write=info.IsWritable(),
         execute=info.IsExecutable(),
         name=name,
-    )
-
-
-def _region_key(region: MemoryRegion) -> RegionKey:
-    return (
-        region.start,
-        region.end,
-        region.read,
-        region.write,
-        region.execute,
-        region.name,
     )

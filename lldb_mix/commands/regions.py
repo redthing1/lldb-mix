@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from lldb_mix.commands.utils import emit_result, module_fullpath
-from lldb_mix.core.memory import read_memory_regions
+from lldb_mix.core.memory import read_memory_regions, regions_unavailable_message
 from lldb_mix.core.session import Session
 from lldb_mix.deref import format_addr
 
@@ -54,7 +54,7 @@ def cmd_regions(debugger, command, result, internal_dict) -> None:
 
     regions = read_memory_regions(process)
     if not regions:
-        emit_result(result, "[lldb-mix] no memory regions", lldb)
+        emit_result(result, regions_unavailable_message(process), lldb)
         return
 
     ptr_size = target.GetAddressByteSize() or 8

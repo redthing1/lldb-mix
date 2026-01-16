@@ -4,7 +4,11 @@ import argparse
 import shlex
 
 from lldb_mix.commands.utils import emit_result, module_fullpath, parse_int
-from lldb_mix.core.memory import ProcessMemoryReader, read_memory_regions
+from lldb_mix.core.memory import (
+    ProcessMemoryReader,
+    read_memory_regions,
+    regions_unavailable_message,
+)
 from lldb_mix.core.session import Session
 from lldb_mix.deref import format_addr
 
@@ -38,7 +42,7 @@ def cmd_findmem(debugger, command, result, internal_dict) -> None:
 
     regions = read_memory_regions(process)
     if not regions:
-        emit_result(result, "[lldb-mix] no memory regions", lldb)
+        emit_result(result, regions_unavailable_message(process), lldb)
         return
 
     reader = ProcessMemoryReader(process)
