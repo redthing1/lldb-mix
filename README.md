@@ -8,7 +8,7 @@ a modern, context-aware ui for binary-first debugging with **lldb**. inspired by
 ## install
 
 ```sh
-python ./scripts/install.py
+python3 ./scripts/install.py
 ```
 
 ## quick start
@@ -33,6 +33,7 @@ dump [addr|reg|sp|pc] [len]   # hexdump memory at address/register
 db/dw/dd/dq [addr|reg|sp|pc] [len]  # word-sized dumps (byte/word/dword/qword)
 u [addr|reg|pc] [count]       # disassemble instructions
 findmem ...                   # search memory across regions
+mixhelp [-v] [pattern]        # list lldb-mix commands
 rr [args...]                  # run to entrypoint (stop at entry)
 skip [count]                  # skip N instructions (default 1)
 deref [addr|reg|expr] [-d n]  # explain an address via deref chain
