@@ -15,7 +15,7 @@ class FlowPane(Pane):
         inst = _current_inst(ctx)
         if not inst:
             return False
-        return is_branch_like(inst.mnemonic)
+        return is_branch_like(inst.mnemonic, ctx.snapshot.arch)
 
     def render(self, ctx: PaneContext) -> list[str]:
         snapshot = ctx.snapshot
@@ -40,7 +40,9 @@ class FlowPane(Pane):
             lines.append(f"{mnemonic} {inst.operands}")
         else:
             lines.append(mnemonic)
-        target = resolve_flow_target(inst.mnemonic, inst.operands, snapshot.regs)
+        target = resolve_flow_target(
+            inst.mnemonic, inst.operands, snapshot.regs, snapshot.arch
+        )
         if target is None:
             lines.append("(no flow target resolved)")
             return lines

@@ -52,8 +52,8 @@ class TestArgsPaneFormat(unittest.TestCase):
 
         lines = ArgsPane().render(ctx)
 
-        self.assertEqual(lines[0], "[args:testabi]")
-        self.assertEqual(lines[1], "arg regs")
+        self.assertEqual(lines[0], "[args]")
+        self.assertEqual(lines[1], "abi: testabi")
         self.assertEqual(lines[2], "r0: 0x0000000000001111")
         self.assertEqual(lines[3], "r1: 0x0000000000002222")
 
@@ -85,9 +85,10 @@ class TestArgsPaneFormat(unittest.TestCase):
         with patch("lldb_mix.context.panes.args.read_instructions", return_value=insts):
             lines = ArgsPane().render(ctx)
 
-        self.assertEqual(lines[1], "call args -> 0x0000000000002000")
-        self.assertEqual(lines[2], "r0: 0x0000000000001111")
-        self.assertEqual(lines[3], "r1: 0x0000000000002222")
+        self.assertEqual(lines[1], "abi: testabi")
+        self.assertEqual(lines[2], "call args -> 0x0000000000002000")
+        self.assertEqual(lines[3], "r0: 0x0000000000001111")
+        self.assertEqual(lines[4], "r1: 0x0000000000002222")
 
 
 if __name__ == "__main__":

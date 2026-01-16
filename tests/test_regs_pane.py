@@ -47,9 +47,9 @@ class TestRegsPane(unittest.TestCase):
         self.assertEqual(lines[0], "[regs]")
         self.assertEqual(
             lines[1],
-            "r0: 0x0000000000000001  r1: 0x0000000000000002  r2: 0x0000000000000003",
+            "r0 0x0000000000000001  r1 0x0000000000000002  r2 0x0000000000000003",
         )
-        self.assertEqual(lines[2], "r3: 0x0000000000000004")
+        self.assertEqual(lines[2], "r3 0x0000000000000004")
 
 
 if __name__ == "__main__":

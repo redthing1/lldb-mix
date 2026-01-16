@@ -71,7 +71,9 @@ class ArgsPane(Pane):
         self, ctx: PaneContext, inst, regs: dict[str, int], ptr_size: int
     ) -> str:
         label = self.style(ctx, "call args", "label")
-        target = resolve_flow_target(inst.mnemonic, inst.operands, regs)
+        target = resolve_flow_target(
+            inst.mnemonic, inst.operands, regs, ctx.snapshot.arch
+        )
         if target is None:
             return label
         arrow = self.style(ctx, "->", "arrow")

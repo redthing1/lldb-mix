@@ -3,12 +3,12 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from lldb_mix.arch.riscv import RISCV_ALIAS_TO_X, RISCV_X_TO_ALIAS
+from lldb_mix.arch.base import ArchSpec
 from lldb_mix.context.formatting import deref_summary
 from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.types import PaneContext
 from lldb_mix.core.disasm import disasm_flavor, read_instructions, read_instructions_around
-from lldb_mix.core.flow import is_branch_like, resolve_flow_target
+from lldb_mix.core.flow import branch_decision, is_branch_like, resolve_flow_target
 from lldb_mix.deref import format_addr, format_symbol
 from lldb_mix.ui.text import pad_ansi, truncate_ansi, visible_len
 
@@ -27,11 +27,6 @@ class _CodeState:
     flavor: str
 
 
-@dataclass(frozen=True)
-class BranchDecision:
-    taken: bool
-    reason: str
-    kind: str
 
 
 class CodePane(Pane):
@@ -153,7 +148,7 @@ def _operand_annotations(
         return []
 
     reg_map = {name.lower(): name for name in regs}
-    reg_map.update(_alias_registers(regs))
+    reg_map.update(_alias_registers(ctx.snapshot.arch, regs))
     reg_names = sorted(reg_map.keys(), key=len, reverse=True)
     pattern = re.compile(
         _REG_BOUNDARY.format(name="|".join(re.escape(name) for name in reg_names)),
@@ -182,7 +177,7 @@ def _operand_annotations(
         else:
             pieces.append(f"{display}={addr_text}")
 
-    mem_addr = _compute_mem_addr(operands, regs, pattern)
+    mem_addr = _compute_mem_addr(operands, regs, pattern, ctx.snapshot.arch)
     if mem_addr is not None:
         mem_text = format_addr(mem_addr, ptr_size)
         summary = _annotation_for_addr(ctx, mem_addr, ptr_size)
@@ -201,11 +196,14 @@ def _annotation_for_addr(ctx: PaneContext, addr: int, ptr_size: int) -> str | No
 
 
 def _compute_mem_addr(
-    operands: str, regs: dict[str, int], pattern: re.Pattern[str]
+    operands: str,
+    regs: dict[str, int],
+    pattern: re.Pattern[str],
+    arch: ArchSpec,
 ) -> int | None:
     for expr in re.findall(r"\[([^\]]+)\]", operands):
         cleaned = expr.replace("#", "").replace("!", "")
-        regs_in = _regs_in_text(cleaned, regs, pattern)
+        regs_in = _regs_in_text(cleaned, regs, pattern, arch)
         if len(regs_in) != 1:
             continue
         base = regs.get(regs_in[0])
@@ -217,10 +215,13 @@ def _compute_mem_addr(
 
 
 def _regs_in_text(
-    text: str, regs: dict[str, int], pattern: re.Pattern[str]
+    text: str,
+    regs: dict[str, int],
+    pattern: re.Pattern[str],
+    arch: ArchSpec,
 ) -> list[str]:
     reg_map = {name.lower(): name for name in regs}
-    reg_map.update(_alias_registers(regs))
+    reg_map.update(_alias_registers(arch, regs))
     seen: set[str] = set()
     out: list[str] = []
     for match in pattern.finditer(text):
@@ -252,7 +253,7 @@ def _branch_taken_hint(
     arch,
     flags: int,
 ) -> str | None:
-    decision = _branch_decision(
+    decision = branch_decision(
         mnemonic,
         operands,
         regs,
@@ -272,209 +273,11 @@ def _branch_taken_hint(
     return "taken" if taken else "not taken"
 
 
-def _branch_decision(
-    mnemonic: str,
-    operands: str,
-    regs: dict[str, int],
-    arch,
-    flags: int,
-    include_unconditional: bool = False,
-    include_calls: bool = False,
-) -> BranchDecision | None:
-    if arch.is_conditional_branch(mnemonic):
-        taken, reason = arch.branch_taken(mnemonic, flags)
-        if not reason:
-            return None
-        return BranchDecision(taken, reason, "conditional")
-
-    mnem = mnemonic.lower()
-    if mnem in {"cbz", "cbnz"}:
-        reg = operands.split(",", 1)[0].strip()
-        value = _reg_value(reg, regs)
-        if value is None:
-            return None
-        taken = (value == 0) if mnem == "cbz" else (value != 0)
-        reason = f"{reg}={'0' if value == 0 else '!=0'}"
-        return BranchDecision(taken, reason, "conditional")
-
-    if mnem in {"tbz", "tbnz"}:
-        parts = [p.strip() for p in operands.split(",")]
-        if len(parts) < 2:
-            return None
-        reg = parts[0]
-        value = _reg_value(reg, regs)
-        if value is None:
-            return None
-        bit_text = parts[1].lstrip("#")
-        try:
-            bit = int(bit_text, 0)
-        except ValueError:
-            return None
-        bit_set = (value >> bit) & 1
-        taken = (bit_set == 0) if mnem == "tbz" else (bit_set == 1)
-        reason = f"{reg}[{bit}]={bit_set}"
-        return BranchDecision(taken, reason, "conditional")
-
-    if mnem in {"beq", "bne", "blt", "bge", "bltu", "bgeu"}:
-        parts = [p.strip() for p in operands.split(",")]
-        if len(parts) < 2:
-            return None
-        lhs = _reg_value(parts[0], regs)
-        rhs = _reg_value(parts[1], regs)
-        if lhs is None or rhs is None:
-            return None
-        bits = max(getattr(arch, "ptr_size", 0), 1) * 8
-        if mnem == "beq":
-            return BranchDecision(lhs == rhs, f"{parts[0]}=={parts[1]}", "conditional")
-        if mnem == "bne":
-            return BranchDecision(lhs != rhs, f"{parts[0]}!={parts[1]}", "conditional")
-        if mnem in {"blt", "bge"}:
-            lhs_signed = _to_signed(lhs, bits)
-            rhs_signed = _to_signed(rhs, bits)
-            taken = lhs_signed < rhs_signed if mnem == "blt" else lhs_signed >= rhs_signed
-            op = "<" if mnem == "blt" else ">="
-            return BranchDecision(taken, f"{parts[0]}{op}{parts[1]}", "conditional")
-        if mnem in {"bltu", "bgeu"}:
-            lhs_u = _to_unsigned(lhs, bits)
-            rhs_u = _to_unsigned(rhs, bits)
-            taken = lhs_u < rhs_u if mnem == "bltu" else lhs_u >= rhs_u
-            op = "<" if mnem == "bltu" else ">="
-            return BranchDecision(taken, f"{parts[0]}{op}{parts[1]}", "conditional")
-
-    if mnem in {"beqz", "bnez", "c.beqz", "c.bnez"}:
-        parts = [p.strip() for p in operands.split(",")]
-        if not parts:
-            return None
-        reg = parts[0]
-        value = _reg_value(reg, regs)
-        if value is None:
-            return None
-        taken = value == 0 if mnem in {"beqz", "c.beqz"} else value != 0
-        reason = f"{reg}={'0' if value == 0 else '!=0'}"
-        return BranchDecision(taken, reason, "conditional")
-
-    if mnem in {"jcxz", "jecxz", "jrcxz"}:
-        value = _reg_value("rcx", regs)
-        if value is None:
-            return None
-        bits = 64
-        reg_label = "rcx"
-        if mnem == "jcxz":
-            bits = 16
-            reg_label = "cx"
-        elif mnem == "jecxz":
-            bits = 32
-            reg_label = "ecx"
-        masked = _to_unsigned(value, bits)
-        taken = masked == 0
-        return BranchDecision(taken, f"{reg_label}=0", "conditional")
-
-    if mnem in {"loop", "loope", "loopne", "loopnz", "loopz"}:
-        value = _reg_value("rcx", regs)
-        if value is None:
-            return None
-        next_val = _to_unsigned(value - 1, 64)
-        taken = next_val != 0
-        reason = "rcx-1!=0"
-        zf = bool(flags & (1 << 6))
-        if mnem in {"loope", "loopz"}:
-            taken = taken and zf
-            reason = "rcx-1!=0 and zf=1"
-        if mnem in {"loopne", "loopnz"}:
-            taken = taken and (not zf)
-            reason = "rcx-1!=0 and zf=0"
-        return BranchDecision(taken, reason, "conditional")
-
-    if include_unconditional and mnem in {"jal", "jalr", "c.jal", "c.jalr"}:
-        rd = _riscv_rd(operands)
-        if rd and _reg_is_zero(rd):
-            return BranchDecision(True, "", "unconditional")
-
-    if include_calls and arch.is_call(mnemonic):
-        return BranchDecision(True, "", "call")
-
-    if include_unconditional and arch.is_unconditional_branch(mnemonic):
-        return BranchDecision(True, "", "unconditional")
-
-    return None
-
-
-def _reg_value(token: str, regs: dict[str, int]) -> int | None:
-    key = token.strip().lower()
-    reg_map = {name.lower(): name for name in regs}
-    reg_map.update(_alias_registers(regs))
-    canon = reg_map.get(key)
-    if not canon:
-        return None
-    return regs.get(canon)
-
-
-def _alias_registers(regs: dict[str, int]) -> dict[str, str]:
-    aliases: dict[str, str] = {}
-    lower = {name.lower() for name in regs}
-    if any(name.startswith("x") and name[1:].isdigit() for name in lower):
-        for name in lower:
-            if name.startswith("x") and name[1:].isdigit():
-                aliases[f"w{name[1:]}"] = name
-        if "fp" in lower:
-            aliases["x29"] = "fp"
-            aliases["w29"] = "fp"
-        if "lr" in lower:
-            aliases["x30"] = "lr"
-            aliases["w30"] = "lr"
-    if "rax" in lower:
-        pairs = {
-            "eax": "rax",
-            "ebx": "rbx",
-            "ecx": "rcx",
-            "edx": "rdx",
-            "esi": "rsi",
-            "edi": "rdi",
-            "ebp": "rbp",
-            "esp": "rsp",
-            "eip": "rip",
-        }
-        aliases.update({alias: reg for alias, reg in pairs.items() if reg in lower})
-        for idx in range(8, 16):
-            reg = f"r{idx}"
-            if reg in lower:
-                aliases[f"r{idx}d"] = reg
-    for alias, reg in RISCV_ALIAS_TO_X.items():
-        if reg in lower:
-            aliases[alias] = reg
-    for reg, alias in RISCV_X_TO_ALIAS.items():
-        if alias in lower:
-            aliases[reg] = alias
-    return aliases
-
-
-def _riscv_rd(operands: str) -> str | None:
-    parts = [p.strip() for p in operands.split(",") if p.strip()]
-    if not parts:
-        return None
-    return parts[0]
-
-
-def _reg_is_zero(name: str) -> bool:
-    key = name.strip().lower()
-    return key in {"x0", "zero"}
-
-
-def _to_unsigned(value: int, bits: int) -> int:
-    if bits <= 0:
-        return value
-    mask = (1 << bits) - 1
-    return value & mask
-
-
-def _to_signed(value: int, bits: int) -> int:
-    if bits <= 0:
-        return value
-    masked = _to_unsigned(value, bits)
-    sign_bit = 1 << (bits - 1)
-    if masked & sign_bit:
-        return masked - (1 << bits)
-    return masked
+def _alias_registers(arch: ArchSpec, regs: dict[str, int]) -> dict[str, str]:
+    try:
+        return arch.register_aliases(regs)
+    except Exception:
+        return {}
 
 
 def _render_branch_split(
@@ -487,7 +290,7 @@ def _render_branch_split(
     snapshot = ctx.snapshot
     arch = snapshot.arch
     current = insts[current_idx]
-    decision = _branch_decision(
+    decision = branch_decision(
         current.mnemonic,
         current.operands,
         snapshot.regs,
@@ -508,6 +311,7 @@ def _render_branch_split(
         current.mnemonic,
         current.operands,
         snapshot.regs,
+        arch,
     )
     fallthrough = _fallthrough_addr(insts, current_idx, arch)
     if target is None or fallthrough is None:
@@ -664,11 +468,12 @@ def _inst_comment(ctx: PaneContext, inst, ptr_size: int, flags: int) -> str | No
             ptr_size,
         )
     )
-    if is_branch_like(inst.mnemonic):
+    if is_branch_like(inst.mnemonic, ctx.snapshot.arch):
         target = resolve_flow_target(
             inst.mnemonic,
             inst.operands,
             ctx.snapshot.regs,
+            ctx.snapshot.arch,
         )
         if target is not None:
             target_text = format_addr(target, ptr_size)

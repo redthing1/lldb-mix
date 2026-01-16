@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
 
+from lldb_mix.arch.arm64 import ARM64_ARCH
 from lldb_mix.arch.base import ArchSpec
 from lldb_mix.context.panes.code import CodePane
 from lldb_mix.context.types import PaneContext
@@ -66,13 +67,7 @@ class TestCodePaneFormat(unittest.TestCase):
         self.assertEqual(lines[2], "   0x0000000000001001 90 90 90 mov eax, ebx")
 
     def test_branch_comment(self):
-        arch = ArchSpec(
-            name="test",
-            ptr_size=8,
-            gpr_names=(),
-            pc_reg="pc",
-            sp_reg="sp",
-        )
+        arch = ARM64_ARCH
         snapshot = ContextSnapshot(
             arch=arch,
             pc=0x1000,
@@ -119,13 +114,7 @@ class TestCodePaneFormat(unittest.TestCase):
         )
 
     def test_branch_symbol_target(self):
-        arch = ArchSpec(
-            name="test",
-            ptr_size=8,
-            gpr_names=(),
-            pc_reg="pc",
-            sp_reg="sp",
-        )
+        arch = ARM64_ARCH
         snapshot = ContextSnapshot(
             arch=arch,
             pc=0x1000,

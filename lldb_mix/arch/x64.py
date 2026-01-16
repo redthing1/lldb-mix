@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from lldb_mix.arch.base import ArchSpec
+from lldb_mix.arch.base import ArchSpec, BranchDecision, parse_target_operand
 
 _FLAG_BITS = {
     "cf": 0,
@@ -47,6 +47,16 @@ _COND_MNEMONICS = {
     "jnle",
 }
 
+_LOOP_MNEMONICS = {
+    "loop",
+    "loope",
+    "loopne",
+    "loopnz",
+    "loopz",
+}
+
+_JCXZ_MNEMONICS = {"jcxz", "jecxz", "jrcxz"}
+
 
 class X64Arch(ArchSpec):
     def format_flags(self, value: int) -> str:
@@ -74,6 +84,83 @@ class X64Arch(ArchSpec):
 
     def is_unconditional_branch(self, mnemonic: str) -> bool:
         return mnemonic.lower().startswith("jmp")
+
+    def is_branch_like(self, mnemonic: str) -> bool:
+        mnem = mnemonic.lower()
+        if mnem.startswith("ret"):
+            return True
+        if mnem in _LOOP_MNEMONICS or mnem in _JCXZ_MNEMONICS:
+            return True
+        return super().is_branch_like(mnemonic)
+
+    def resolve_flow_target(
+        self, mnemonic: str, operands: str, regs: dict[str, int]
+    ) -> int | None:
+        if not self.is_branch_like(mnemonic):
+            return None
+        if not operands:
+            return None
+        op = operands.split(",", 1)[0].strip()
+        return parse_target_operand(op, regs)
+
+    def branch_decision(
+        self,
+        mnemonic: str,
+        operands: str,
+        regs: dict[str, int],
+        flags: int,
+        include_unconditional: bool = False,
+        include_calls: bool = False,
+    ) -> BranchDecision | None:
+        decision = super().branch_decision(
+            mnemonic,
+            operands,
+            regs,
+            flags,
+            include_unconditional=False,
+            include_calls=False,
+        )
+        if decision:
+            return decision
+
+        mnem = mnemonic.lower()
+        if mnem in _JCXZ_MNEMONICS:
+            value = regs.get("rcx")
+            if value is None:
+                return None
+            bits = 64
+            reg_label = "rcx"
+            if mnem == "jcxz":
+                bits = 16
+                reg_label = "cx"
+            elif mnem == "jecxz":
+                bits = 32
+                reg_label = "ecx"
+            masked = _to_unsigned(value, bits)
+            taken = masked == 0
+            return BranchDecision(taken, f"{reg_label}=0", "conditional")
+
+        if mnem in _LOOP_MNEMONICS:
+            value = regs.get("rcx")
+            if value is None:
+                return None
+            next_val = _to_unsigned(value - 1, 64)
+            taken = next_val != 0
+            reason = "rcx-1!=0"
+            zf = bool(flags & (1 << _FLAG_BITS["zf"]))
+            if mnem in {"loope", "loopz"}:
+                taken = taken and zf
+                reason = "rcx-1!=0 and zf=1"
+            if mnem in {"loopne", "loopnz"}:
+                taken = taken and (not zf)
+                reason = "rcx-1!=0 and zf=0"
+            return BranchDecision(taken, reason, "conditional")
+
+        if include_calls and self.is_call(mnemonic):
+            return BranchDecision(True, "", "call")
+        if include_unconditional and self.is_unconditional_branch(mnemonic):
+            return BranchDecision(True, "", "unconditional")
+        return None
 
     def branch_taken(self, mnemonic: str, flags: int) -> tuple[bool, str]:
         mnem = mnemonic.lower()
@@ -117,6 +204,35 @@ class X64Arch(ArchSpec):
             return (not zf and sf == of), "zf=0 and sf=of"
 
         return False, ""
+
+    def register_aliases(self, regs: dict[str, int]) -> dict[str, str]:
+        aliases: dict[str, str] = {}
+        lower = {name.lower() for name in regs}
+        if "rax" in lower:
+            pairs = {
+                "eax": "rax",
+                "ebx": "rbx",
+                "ecx": "rcx",
+                "edx": "rdx",
+                "esi": "rsi",
+                "edi": "rdi",
+                "ebp": "rbp",
+                "esp": "rsp",
+                "eip": "rip",
+            }
+            aliases.update({alias: reg for alias, reg in pairs.items() if reg in lower})
+            for idx in range(8, 16):
+                reg = f"r{idx}"
+                if reg in lower:
+                    aliases[f"r{idx}d"] = reg
+        return aliases
+
+
+def _to_unsigned(value: int, bits: int) -> int:
+    if bits <= 0:
+        return value
+    mask = (1 << bits) - 1
+    return value & mask
 
 
 X64_ARCH = X64Arch(

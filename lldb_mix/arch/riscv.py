@@ -1,7 +1,15 @@
 from __future__ import annotations
 
+import re
+
 from lldb_mix.arch.abi import RISCV_ABI, RISCV_X_ABI
-from lldb_mix.arch.base import ArchSpec
+from lldb_mix.arch.base import (
+    ArchSpec,
+    BranchDecision,
+    parse_immediate,
+    parse_leading_int,
+    resolve_reg_operand,
+)
 
 RISCV_ALIAS_TO_X = {
     "zero": "x0",
@@ -119,11 +127,187 @@ _CALL_MNEMONICS = (
     "c.jalr",
 )
 
+_RISCV_BRANCHES = {
+    "beq",
+    "bne",
+    "blt",
+    "bge",
+    "bltu",
+    "bgeu",
+    "beqz",
+    "bnez",
+    "c.beqz",
+    "c.bnez",
+}
+
+_RISCV_JUMPS = {
+    "b",
+    "j",
+    "jr",
+    "jal",
+    "jalr",
+    "c.j",
+    "c.jr",
+    "c.jal",
+    "c.jalr",
+    "ret",
+}
+
+_BASE_OFFSET_RE = re.compile(
+    r"^(?P<offset>[-+]?0x[0-9a-fA-F]+|[-+]?\d+)?\((?P<reg>[^)]+)\)$"
+)
+
 
 class RiscvArch(ArchSpec):
     def is_unconditional_branch(self, mnemonic: str) -> bool:
         mnem = mnemonic.lower()
         return mnem in {"b", "j", "jr", "c.j", "c.jr"}
+
+    def is_branch_like(self, mnemonic: str) -> bool:
+        mnem = mnemonic.lower()
+        if mnem in _RISCV_BRANCHES or mnem in _RISCV_JUMPS:
+            return True
+        return super().is_branch_like(mnemonic)
+
+    def resolve_flow_target(
+        self, mnemonic: str, operands: str, regs: dict[str, int]
+    ) -> int | None:
+        if not self.is_branch_like(mnemonic):
+            return None
+
+        mnem = mnemonic.lower()
+        aliases = self.register_aliases(regs)
+
+        if mnem == "ret":
+            return resolve_reg_operand("ra", regs, aliases)
+
+        parts = [p.strip() for p in operands.split(",")] if operands else []
+        if mnem in _RISCV_BRANCHES:
+            if mnem in {"beqz", "bnez", "c.beqz", "c.bnez"}:
+                if len(parts) < 2:
+                    return None
+                return _parse_target_operand(parts[1], regs, aliases)
+            if len(parts) < 3:
+                return None
+            return _parse_target_operand(parts[2], regs, aliases)
+
+        if mnem in {"b", "j", "c.j"}:
+            if not parts:
+                return None
+            return _parse_target_operand(parts[0], regs, aliases)
+
+        if mnem == "jal":
+            if len(parts) == 1:
+                return _parse_target_operand(parts[0], regs, aliases)
+            return _parse_target_operand(parts[1], regs, aliases)
+
+        if mnem in {"jalr", "jr", "c.jr", "c.jalr"}:
+            if not parts:
+                return None
+            if mnem in {"jr", "c.jr"}:
+                base = _parse_base_offset(parts[0], regs, aliases)
+                if base is not None:
+                    return base
+                return resolve_reg_operand(parts[0], regs, aliases)
+            if len(parts) == 1:
+                return resolve_reg_operand(parts[0], regs, aliases)
+            base = _parse_base_offset(parts[1], regs, aliases)
+            if base is None:
+                base = resolve_reg_operand(parts[1], regs, aliases)
+            if base is None:
+                return None
+            offset = 0
+            if len(parts) >= 3:
+                parsed = parse_immediate(parts[2])
+                if parsed is not None:
+                    offset = parsed
+            return base + offset
+
+        if not parts:
+            return None
+        return _parse_target_operand(parts[0], regs, aliases)
+
+    def branch_decision(
+        self,
+        mnemonic: str,
+        operands: str,
+        regs: dict[str, int],
+        flags: int,
+        include_unconditional: bool = False,
+        include_calls: bool = False,
+    ) -> BranchDecision | None:
+        decision = super().branch_decision(
+            mnemonic,
+            operands,
+            regs,
+            flags,
+            include_unconditional=False,
+            include_calls=False,
+        )
+        if decision:
+            return decision
+
+        mnem = mnemonic.lower()
+        aliases = self.register_aliases(regs)
+        if mnem in _RISCV_BRANCHES:
+            if mnem in {"beqz", "bnez", "c.beqz", "c.bnez"}:
+                parts = [p.strip() for p in operands.split(",")] if operands else []
+                if not parts:
+                    return None
+                reg = parts[0]
+                value = resolve_reg_operand(reg, regs, aliases)
+                if value is None:
+                    return None
+                taken = value == 0 if mnem in {"beqz", "c.beqz"} else value != 0
+                reason = f"{reg}={'0' if value == 0 else '!=0'}"
+                return BranchDecision(taken, reason, "conditional")
+
+            parts = [p.strip() for p in operands.split(",")] if operands else []
+            if len(parts) < 2:
+                return None
+            lhs = resolve_reg_operand(parts[0], regs, aliases)
+            rhs = resolve_reg_operand(parts[1], regs, aliases)
+            if lhs is None or rhs is None:
+                return None
+            bits = max(getattr(self, "ptr_size", 0), 1) * 8
+            if mnem == "beq":
+                return BranchDecision(lhs == rhs, f"{parts[0]}=={parts[1]}", "conditional")
+            if mnem == "bne":
+                return BranchDecision(lhs != rhs, f"{parts[0]}!={parts[1]}", "conditional")
+            if mnem in {"blt", "bge"}:
+                lhs_signed = _to_signed(lhs, bits)
+                rhs_signed = _to_signed(rhs, bits)
+                taken = lhs_signed < rhs_signed if mnem == "blt" else lhs_signed >= rhs_signed
+                op = "<" if mnem == "blt" else ">="
+                return BranchDecision(taken, f"{parts[0]}{op}{parts[1]}", "conditional")
+            if mnem in {"bltu", "bgeu"}:
+                lhs_u = _to_unsigned(lhs, bits)
+                rhs_u = _to_unsigned(rhs, bits)
+                taken = lhs_u < rhs_u if mnem == "bltu" else lhs_u >= rhs_u
+                op = "<" if mnem == "bltu" else ">="
+                return BranchDecision(taken, f"{parts[0]}{op}{parts[1]}", "conditional")
+
+        if include_unconditional and mnem in {"jal", "jalr", "c.jal", "c.jalr"}:
+            rd = _riscv_rd(operands)
+            if rd and _reg_is_zero(rd):
+                return BranchDecision(True, "", "unconditional")
+
+        if include_calls and self.is_call(mnemonic):
+            return BranchDecision(True, "", "call")
+        if include_unconditional and self.is_unconditional_branch(mnemonic):
+            return BranchDecision(True, "", "unconditional")
+        return None
+
+    def register_aliases(self, regs: dict[str, int]) -> dict[str, str]:
+        aliases: dict[str, str] = {}
+        lower = {name.lower() for name in regs}
+        for alias, reg in RISCV_ALIAS_TO_X.items():
+            if reg in lower:
+                aliases[alias] = reg
+        for reg, alias in RISCV_X_TO_ALIAS.items():
+            if alias in lower:
+                aliases[reg] = alias
+        return aliases
 
 
 RISCV32_X_ARCH = RiscvArch(
@@ -189,3 +373,62 @@ RISCV64_ABI_ARCH = RiscvArch(
     abi=RISCV_ABI,
     call_mnemonics=_CALL_MNEMONICS,
 )
+
+
+def _parse_target_operand(
+    op: str, regs: dict[str, int], aliases: dict[str, str]
+) -> int | None:
+    if not op:
+        return None
+    parsed = parse_immediate(op)
+    if parsed is None:
+        parsed = parse_leading_int(op)
+    if parsed is not None:
+        return parsed
+    return resolve_reg_operand(op, regs, aliases)
+
+
+def _parse_base_offset(
+    op: str, regs: dict[str, int], aliases: dict[str, str]
+) -> int | None:
+    match = _BASE_OFFSET_RE.match(op.strip())
+    if not match:
+        return None
+    reg_name = match.group("reg").strip()
+    base = resolve_reg_operand(reg_name, regs, aliases)
+    if base is None:
+        return None
+    offset_text = match.group("offset") or "0"
+    offset = parse_immediate(offset_text)
+    if offset is None:
+        return None
+    return base + offset
+
+
+def _riscv_rd(operands: str) -> str | None:
+    parts = [p.strip() for p in operands.split(",") if p.strip()]
+    if not parts:
+        return None
+    return parts[0]
+
+
+def _reg_is_zero(name: str) -> bool:
+    key = name.strip().lower()
+    return key in {"x0", "zero"}
+
+
+def _to_unsigned(value: int, bits: int) -> int:
+    if bits <= 0:
+        return value
+    mask = (1 << bits) - 1
+    return value & mask
+
+
+def _to_signed(value: int, bits: int) -> int:
+    if bits <= 0:
+        return value
+    masked = _to_unsigned(value, bits)
+    sign_bit = 1 << (bits - 1)
+    if masked & sign_bit:
+        return masked - (1 << bits)
+    return masked
