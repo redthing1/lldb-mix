@@ -14,6 +14,10 @@ from lldb_mix.core.config import (
 from lldb_mix.core.state import SETTINGS
 from lldb_mix.core.stop_hooks import ensure_stop_hook, remove_stop_hook
 from lldb_mix.core.stop_output import apply_quiet, capture_defaults, restore_defaults
+from lldb_mix.ui.style import colorize
+from lldb_mix.ui.table import Column, render_table
+from lldb_mix.ui.terminal import get_terminal_size
+from lldb_mix.ui.theme import get_theme
 
 
 def cmd_conf(debugger, command, result, internal_dict) -> None:
@@ -56,12 +60,29 @@ def cmd_conf(debugger, command, result, internal_dict) -> None:
 
 
 def _handle_list() -> str:
-    lines = ["[lldb-mix] conf settings:"]
+    theme = get_theme(SETTINGS.theme)
+    term_width, _ = get_terminal_size()
+
+    def _style(text: str, role: str) -> str:
+        return colorize(text, role, theme, SETTINGS.enable_color)
+
+    rows = []
     for spec in list_specs():
         value = format_setting(SETTINGS, spec.key)
         if value is None:
             continue
-        lines.append(f"{spec.key} = {value}")
+        rows.append({"key": spec.key, "value": value})
+
+    header = _style("[lldb-mix] conf settings:", "title")
+    if not rows:
+        return f"{header}\n{_style('(none)', 'muted')}"
+
+    columns = [
+        Column("key", "KEY", role="label"),
+        Column("value", "VALUE", role="value", optional=True, truncate="right"),
+    ]
+    lines = [header]
+    lines.extend(render_table(rows, columns, term_width, _style))
     return "\n".join(lines)
 
 

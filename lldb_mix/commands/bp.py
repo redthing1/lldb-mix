@@ -4,8 +4,14 @@ import shlex
 
 from lldb_mix.commands.utils import emit_result
 from lldb_mix.core.addressing import parse_int
-from lldb_mix.core.breakpoints import clear_breakpoints, format_breakpoint_list
+from lldb_mix.core.breakpoints import clear_breakpoints, collect_breakpoints
 from lldb_mix.core.session import Session
+from lldb_mix.core.state import SETTINGS
+from lldb_mix.deref import format_addr
+from lldb_mix.ui.style import colorize
+from lldb_mix.ui.table import Column, render_table
+from lldb_mix.ui.terminal import get_terminal_size
+from lldb_mix.ui.theme import get_theme
 
 
 def cmd_bp(debugger, command, result, internal_dict) -> None:
@@ -44,7 +50,59 @@ def cmd_bp(debugger, command, result, internal_dict) -> None:
 def _handle_list(debugger) -> list[str]:
     session = Session(debugger)
     target = session.target()
-    return format_breakpoint_list(target)
+    if not target or not target.IsValid():
+        return ["[lldb-mix] target unavailable"]
+
+    theme = get_theme(SETTINGS.theme)
+    term_width, _ = get_terminal_size()
+
+    def _style(text: str, role: str) -> str:
+        return colorize(text, role, theme, SETTINGS.enable_color)
+
+    infos = collect_breakpoints(target)
+    header = _style("[lldb-mix] breakpoints:", "title")
+    if not infos:
+        return [header, _style("(none)", "muted")]
+
+    ptr_size = target.GetAddressByteSize() or 8
+    rows = []
+    has_module = False
+    has_offset = False
+    for info in infos:
+        addr_text = format_addr(info.addr, ptr_size) if info.addr is not None else ""
+        module_text = info.module or ""
+        offset_text = f"+0x{info.offset:x}" if info.offset is not None else ""
+        if module_text:
+            has_module = True
+        if offset_text:
+            has_offset = True
+        rows.append(
+            {
+                "id": f"#{info.bp_id}",
+                "state": "enabled" if info.enabled else "disabled",
+                "locs": str(info.locations),
+                "addr": addr_text,
+                "module": module_text,
+                "offset": offset_text,
+            }
+        )
+
+    columns = [
+        Column("id", "ID", role="label", align="right", min_width=2),
+        Column("state", "STATE", role="value"),
+        Column("locs", "LOCS", role="value", align="right"),
+        Column("addr", "ADDR", role="addr"),
+    ]
+    if has_module:
+        columns.append(
+            Column("module", "MODULE", role="symbol", optional=True, priority=2)
+        )
+    if has_offset:
+        columns.append(Column("offset", "OFF", role="value", optional=True, priority=1))
+
+    lines = [header]
+    lines.extend(render_table(rows, columns, term_width, _style))
+    return lines
 
 
 def _handle_toggle(debugger, args: list[str], enabled: bool) -> str:

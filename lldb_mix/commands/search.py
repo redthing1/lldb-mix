@@ -11,7 +11,12 @@ from lldb_mix.core.memory import (
     regions_unavailable_message,
 )
 from lldb_mix.core.session import Session
+from lldb_mix.core.state import SETTINGS
 from lldb_mix.deref import format_addr
+from lldb_mix.ui.style import colorize
+from lldb_mix.ui.table import Column, render_table
+from lldb_mix.ui.terminal import get_terminal_size
+from lldb_mix.ui.theme import get_theme
 
 
 def cmd_findmem(debugger, command, result, internal_dict) -> None:
@@ -48,11 +53,20 @@ def cmd_findmem(debugger, command, result, internal_dict) -> None:
 
     reader = ProcessMemoryReader(process)
     ptr_size = target.GetAddressByteSize() or 8
+    theme = get_theme(SETTINGS.theme)
+    term_width, _ = get_terminal_size()
+
+    def _style(text: str, role: str) -> str:
+        return colorize(text, role, theme, SETTINGS.enable_color)
+
     header = f"[findmem] {parsed.kind} len={len(parsed.pattern)}"
     if parsed.count > 0:
         header += f" count={parsed.count}"
-
-    lines = [header]
+    lines = [_style(header, "title")]
+    scan_lines: list[str] = []
+    rows: list[dict[str, str]] = []
+    has_name = False
+    has_path = False
     hits = 0
     chunk_size = _chunk_size(len(parsed.pattern))
     for region in regions:
@@ -61,7 +75,7 @@ def cmd_findmem(debugger, command, result, internal_dict) -> None:
         if parsed.verbose:
             start = format_addr(region.start, ptr_size)
             end = format_addr(region.end, ptr_size)
-            lines.append(f"[findmem] scanning {start}-{end}")
+            scan_lines.append(_style(f"[findmem] scanning {start}-{end}", "muted"))
         carry = b""
         addr = region.start
         while addr < region.end:
@@ -76,8 +90,22 @@ def cmd_findmem(debugger, command, result, internal_dict) -> None:
                 hit_addr = base + idx
                 if region.start <= hit_addr < region.end:
                     hits += 1
-                    lines.append(_format_hit(target, region, hit_addr, ptr_size, lldb))
+                    row, row_has_name, row_has_path = _hit_row(
+                        target, region, hit_addr, ptr_size, lldb
+                    )
+                    rows.append(row)
+                    has_name = has_name or row_has_name
+                    has_path = has_path or row_has_path
                     if parsed.count > 0 and hits >= parsed.count:
+                        lines.extend(scan_lines)
+                        if rows:
+                            lines.extend(
+                                _format_hit_table(
+                                    rows, has_name, has_path, term_width, _style
+                                )
+                            )
+                        else:
+                            lines.append(_style("(no matches)", "muted"))
                         emit_result(result, "\n".join(lines), lldb)
                         return
                 idx = haystack.find(parsed.pattern, idx + 1)
@@ -88,7 +116,13 @@ def cmd_findmem(debugger, command, result, internal_dict) -> None:
             addr += size
 
     if hits == 0:
-        lines.append("(no matches)")
+        lines.extend(scan_lines)
+        lines.append(_style("(no matches)", "muted"))
+        emit_result(result, "\n".join(lines), lldb)
+        return
+
+    lines.extend(scan_lines)
+    lines.extend(_format_hit_table(rows, has_name, has_path, term_width, _style))
     emit_result(result, "\n".join(lines), lldb)
 
 
@@ -192,25 +226,72 @@ def _pattern_from_opts(opts) -> tuple[bytes | None, str, str | None]:
     return None, "", "invalid pattern"
 
 
-def _format_hit(target, region, addr: int, ptr_size: int, lldb_module) -> str:
+def _hit_row(target, region, addr: int, ptr_size: int, lldb_module):
     base = format_addr(region.start, ptr_size)
     offset = format_addr(addr - region.start, ptr_size)
     addr_text = format_addr(addr, ptr_size)
-    prot = "".join(
+    prot = _perm_string(region)
+    name = (region.name or "").strip()
+    module_path = _module_path(target, addr, lldb_module)
+    return (
+        {
+            "addr": addr_text,
+            "base": base,
+            "offset": offset,
+            "prot": prot,
+            "name": name,
+            "path": module_path,
+        },
+        bool(name),
+        bool(module_path),
+    )
+
+
+def _format_hit_table(
+    rows: list[dict[str, str]],
+    has_name: bool,
+    has_path: bool,
+    term_width: int,
+    style,
+) -> list[str]:
+    columns = [
+        Column("addr", "ADDR", role="addr"),
+        Column("base", "BASE", role="value"),
+        Column("offset", "OFF", role="value"),
+        Column("prot", "PROT", role="label"),
+    ]
+    if has_name:
+        columns.append(
+            Column(
+                "name",
+                "NAME",
+                role="symbol",
+                optional=True,
+                priority=2,
+            )
+        )
+    if has_path:
+        columns.append(
+            Column(
+                "path",
+                "PATH",
+                role="muted",
+                optional=True,
+                priority=1,
+                truncate="left",
+            )
+        )
+    return render_table(rows, columns, term_width, style)
+
+
+def _perm_string(region) -> str:
+    return "".join(
         [
             "r" if region.read else "-",
             "w" if region.write else "-",
             "x" if region.execute else "-",
         ]
     )
-    name = (region.name or "").strip()
-    module_path = _module_path(target, addr, lldb_module)
-    detail = f"base={base} off={offset} {prot}"
-    if name:
-        detail += f" {name}"
-    if module_path:
-        detail += f" {module_path}"
-    return f"{addr_text} {detail}".rstrip()
 
 
 def _module_path(target, addr: int, lldb_module) -> str:

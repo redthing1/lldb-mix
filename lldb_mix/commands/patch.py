@@ -8,8 +8,12 @@ from lldb_mix.core.addressing import AddressResolver, parse_int
 from lldb_mix.core.patches import format_bytes, parse_hex_bytes
 from lldb_mix.core.session import Session
 from lldb_mix.core.snapshot import capture_snapshot
-from lldb_mix.core.state import PATCHES
+from lldb_mix.core.state import PATCHES, SETTINGS
 from lldb_mix.deref import format_addr
+from lldb_mix.ui.style import colorize
+from lldb_mix.ui.table import Column, render_table
+from lldb_mix.ui.terminal import get_terminal_size
+from lldb_mix.ui.theme import get_theme
 
 
 def cmd_patch(debugger, command, result, internal_dict) -> None:
@@ -33,7 +37,13 @@ def cmd_patch(debugger, command, result, internal_dict) -> None:
 
     subcmd = args[0]
     if subcmd == "list":
-        emit_result(result, _list_patches(ptr_size), lldb)
+        theme = get_theme(SETTINGS.theme)
+        term_width, _ = get_terminal_size()
+
+        def _style(text: str, role: str) -> str:
+            return colorize(text, role, theme, SETTINGS.enable_color)
+
+        emit_result(result, "\n".join(_list_patches(ptr_size, term_width, _style)), lldb)
         return
 
     process = session.process()
@@ -165,16 +175,29 @@ def _write_memory(process, addr: int, data: bytes, lldb_module) -> bool:
     return written == len(data)
 
 
-def _list_patches(ptr_size: int) -> str:
+def _list_patches(ptr_size: int, term_width: int, style) -> list[str]:
     entries = PATCHES.list()
     if not entries:
-        return "[lldb-mix] patches: (none)"
-    lines = ["[lldb-mix] patches:"]
+        return [style("[lldb-mix] patches: (none)", "muted")]
+
+    rows = []
     for entry in entries:
-        addr_text = format_addr(entry.addr, ptr_size)
-        bytes_text = format_bytes(entry.patched)
-        lines.append(f"{addr_text} len={entry.size} bytes={bytes_text}")
-    return "\n".join(lines)
+        rows.append(
+            {
+                "addr": format_addr(entry.addr, ptr_size),
+                "len": str(entry.size),
+                "bytes": format_bytes(entry.patched),
+            }
+        )
+
+    columns = [
+        Column("addr", "ADDR", role="addr"),
+        Column("len", "LEN", role="value", align="right"),
+        Column("bytes", "BYTES", role="byte", optional=True, truncate="right"),
+    ]
+    lines = [style("[lldb-mix] patches:", "title")]
+    lines.extend(render_table(rows, columns, term_width, style))
+    return lines
 
 
 def _usage() -> str:

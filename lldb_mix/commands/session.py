@@ -14,7 +14,11 @@ from lldb_mix.core.session_store import (
     load_session,
     save_session,
 )
-from lldb_mix.core.state import WATCHLIST
+from lldb_mix.core.state import SETTINGS, WATCHLIST
+from lldb_mix.ui.style import colorize
+from lldb_mix.ui.table import Column, render_table
+from lldb_mix.ui.terminal import get_terminal_size
+from lldb_mix.ui.theme import get_theme
 
 
 def cmd_session(debugger, command, result, internal_dict) -> None:
@@ -97,8 +101,18 @@ def _handle_list() -> str:
     sessions = list_sessions()
     if not sessions:
         return "[lldb-mix] no sessions"
-    lines = ["[lldb-mix] sessions:"]
-    lines.extend(sessions)
+
+    theme = get_theme(SETTINGS.theme)
+    term_width, _ = get_terminal_size()
+
+    def _style(text: str, role: str) -> str:
+        return colorize(text, role, theme, SETTINGS.enable_color)
+
+    rows = [{"session": path} for path in sessions]
+    columns = [Column("session", "SESSION", role="muted", truncate="left")]
+
+    lines = [_style("[lldb-mix] sessions:", "title")]
+    lines.extend(render_table(rows, columns, term_width, _style))
     return "\n".join(lines)
 
 

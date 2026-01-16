@@ -8,6 +8,7 @@ from lldb_mix.core.modules import (
     module_base,
     module_for_address,
     module_fullpath,
+    module_name,
 )
 from lldb_mix.deref import format_addr
 
@@ -20,6 +21,16 @@ class BreakpointSpec:
     offset: str | None = None
     name: str | None = None
     enabled: bool = True
+
+
+@dataclass(frozen=True)
+class BreakpointInfo:
+    bp_id: int
+    enabled: bool
+    locations: int
+    addr: int | None
+    module: str | None
+    offset: int | None
 
 
 def serialize_breakpoints(target) -> list[dict[str, object]]:
@@ -89,6 +100,41 @@ def format_breakpoint_list(target) -> list[str]:
                 line += f" addr={format_addr(addr, ptr_size)}"
         lines.append(line)
     return lines
+
+
+def collect_breakpoints(target) -> list[BreakpointInfo]:
+    if not target or not target.IsValid():
+        return []
+    infos: list[BreakpointInfo] = []
+    for bp in target.breakpoint_iter():
+        if not bp or not bp.IsValid():
+            continue
+        enabled = bool(bp.IsEnabled())
+        locs = bp.GetNumLocations()
+        addr = None
+        module = None
+        offset = None
+        if locs > 0:
+            loc = bp.GetLocationAtIndex(0)
+            addr = _location_address(target, loc)
+            if addr is not None:
+                mod = module_for_address(target, addr)
+                if mod:
+                    module = module_name(mod) or module_fullpath(mod) or None
+                    base = module_base(target, mod)
+                    if base is not None and addr >= base:
+                        offset = addr - base
+        infos.append(
+            BreakpointInfo(
+                bp_id=bp.GetID(),
+                enabled=enabled,
+                locations=locs,
+                addr=addr,
+                module=module,
+                offset=offset,
+            )
+        )
+    return infos
 
 
 def _apply_spec(target, spec: BreakpointSpec):
@@ -185,4 +231,3 @@ def _location_address(target, location) -> int | None:
 
 def _format_hex(value: int) -> str:
     return f"0x{value:x}"
-
