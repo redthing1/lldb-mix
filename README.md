@@ -2,6 +2,8 @@
 
 a modern lldb context ui for binary-first debugging
 
+![screenshot](./media/lldb_mix_screen1.jpg)
+
 ## install
 
 ```sh
