@@ -58,6 +58,31 @@ AAPCS64 = AbiSpec(
 )
 
 
+ABI_BY_NAME = {
+    SYSV_X64.name: SYSV_X64,
+    WIN64.name: WIN64,
+    AAPCS64.name: AAPCS64,
+}
+
+ABI_ARCHES = {
+    "sysv": ("x86_64", "amd64"),
+    "win64": ("x86_64", "amd64"),
+    "aapcs64": ("arm64", "aarch64"),
+}
+
+
+def lookup_abi(name: str) -> AbiSpec | None:
+    return ABI_BY_NAME.get((name or "").lower())
+
+
+def abi_matches_arch(abi: AbiSpec, arch_name: str) -> bool:
+    if not abi or not arch_name:
+        return False
+    targets = ABI_ARCHES.get(abi.name, ())
+    arch_lower = arch_name.lower()
+    return any(token in arch_lower for token in targets)
+
+
 def select_abi(triple: str, arch_name: str) -> AbiSpec | None:
     triple_lower = (triple or "").lower()
     arch_lower = (arch_name or "").lower()

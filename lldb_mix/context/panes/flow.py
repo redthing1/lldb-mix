@@ -9,6 +9,7 @@ from lldb_mix.deref import format_addr, format_symbol
 
 class FlowPane(Pane):
     name = "flow"
+    column = 0
 
     def render(self, ctx: PaneContext) -> list[str]:
         snapshot = ctx.snapshot

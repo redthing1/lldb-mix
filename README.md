@@ -16,6 +16,8 @@ context                       # show context once
 conf list                     # list settings
 conf get <key>                # show a setting
 conf set <key> <value...>     # update a setting
+conf set abi auto|sysv|win64|aapcs64  # override ABI selection (applies per-arch)
+conf default                 # reset settings to defaults (not persisted)
 conf save                     # persist settings (OS-specific config path)
 conf load                     # load settings (OS-specific config path)
 dump [addr|reg|sp|pc] [len]   # hexdump memory at address/register
@@ -73,7 +75,7 @@ lldb samples/build/sample_basic
 (lldb) command script import /path/to/lldb-mix/lldb_mix_loader.py
 (lldb) breakpoint set -n main
 (lldb) run
-(lldb) conf set layout regs stack watch code
+(lldb) conf set layout regs args stack watch code
 (lldb) conf list
 (lldb) deref $sp
 (lldb) watch add $sp stack
@@ -91,8 +93,9 @@ lldb samples/build/sample_basic
 
 ### Manual Validation Notes
 
-- After `run`, the context output includes a `[lldb-mix]` header, a separator line, and `[regs]`, `[stack]`, and `[code]` sections; registers appear in multiple columns.
-- On wider terminals, panes pack into two columns (for example, regs + stack) while the code pane stays full-width.
+- After `run`, the context output includes a `[lldb-mix]` header framed by separator lines, plus `[regs]`, `[args]`, `[stack]`, and `[code]` sections; registers appear in multiple columns.
+- On wider terminals, panes pack into two columns (for example, regs on the left and args+stack on the right) while the code pane stays full-width.
+- `conf set abi aapcs64` (or `sysv`/`win64` on x86_64) updates the args pane title to show the active ABI.
 - `conf list` prints available settings; `conf set theme base` switches without errors.
 - `conf set clear_screen on` clears the terminal before each context output.
 - `dump sp 64` shows a `[dump] 0x... len=64 width=16` header and four hexdump lines.

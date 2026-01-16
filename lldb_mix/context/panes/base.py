@@ -7,6 +7,7 @@ from lldb_mix.ui.style import colorize
 class Pane:
     name = ""
     full_width = False
+    column: int | None = None
 
     def title(self, ctx: PaneContext | None = None) -> str:
         text = f"[{self.name}]"
@@ -16,6 +17,10 @@ class Pane:
 
     def style(self, ctx: PaneContext, text: str, role: str) -> str:
         return colorize(text, role, ctx.theme, ctx.settings.enable_color)
+
+    def visible(self, ctx: PaneContext) -> bool:
+        _ = ctx
+        return True
 
     def render(self, ctx: PaneContext) -> list[str]:
         return [self.title(ctx), "(not implemented)"]

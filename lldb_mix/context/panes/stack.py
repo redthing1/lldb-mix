@@ -15,6 +15,7 @@ from lldb_mix.deref import (
 
 class StackPane(Pane):
     name = "stack"
+    column = 1
 
     def render(self, ctx: PaneContext) -> list[str]:
         snapshot = ctx.snapshot

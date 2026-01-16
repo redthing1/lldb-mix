@@ -7,6 +7,7 @@ from lldb_mix.core.config import (
     format_setting,
     list_specs,
     load_settings,
+    reset_settings,
     save_settings,
     set_setting,
 )
@@ -45,6 +46,9 @@ def cmd_conf(debugger, command, result, internal_dict) -> None:
         return
     if sub == "load":
         emit_result(result, _handle_load(debugger), lldb)
+        return
+    if sub == "default":
+        emit_result(result, _handle_default(debugger), lldb)
         return
 
     emit_result(result, f"[lldb-mix] unknown conf subcommand: {sub}\n{_usage()}", lldb)
@@ -95,6 +99,12 @@ def _handle_load(debugger) -> str:
     return "[lldb-mix] settings loaded"
 
 
+def _handle_default(debugger) -> str:
+    reset_settings(SETTINGS)
+    _sync_auto_context(debugger)
+    return "[lldb-mix] settings reset to defaults"
+
+
 def _sync_auto_context(debugger) -> None:
     if SETTINGS.auto_context:
         ensure_stop_hook(debugger, "context")
@@ -105,5 +115,5 @@ def _sync_auto_context(debugger) -> None:
 def _usage() -> str:
     return (
         "[lldb-mix] usage: conf [list] | get <key> | set <key> <value...> | "
-        "save | load"
+        "save | load | default"
     )

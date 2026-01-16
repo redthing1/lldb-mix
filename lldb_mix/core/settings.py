@@ -7,7 +7,8 @@ from dataclasses import dataclass, field
 class Settings:
     enable_color: bool = True
     theme: str = "base"
-    layout: list[str] = field(default_factory=lambda: ["regs", "stack", "code"])
+    layout: list[str] = field(default_factory=lambda: ["regs", "args", "stack", "code"])
+    abi: str = "auto"
     aggressive_deref: bool = True
     max_deref_depth: int = 6
     max_string_length: int = 64

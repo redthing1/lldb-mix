@@ -28,6 +28,7 @@ def _stop_reason_name(reason: int) -> str:
 
 class ThreadsPane(Pane):
     name = "threads"
+    column = 0
 
     def render(self, ctx: PaneContext) -> list[str]:
         lines = [self.title(ctx)]

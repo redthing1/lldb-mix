@@ -11,7 +11,7 @@ def render_header(ctx: PaneContext) -> list[str]:
     term_width = max(ctx.term_width, 20)
     header = _build_header_line(ctx, term_width)
     sep = _separator_line(ctx, term_width)
-    return [header, sep]
+    return [sep, header, sep]
 
 
 def _build_header_line(ctx: PaneContext, term_width: int) -> str:

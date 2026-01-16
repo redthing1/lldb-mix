@@ -1,7 +1,6 @@
 import unittest
 from unittest.mock import patch
 
-from lldb_mix.arch.abi import AbiSpec
 from lldb_mix.arch.base import ArchSpec
 from lldb_mix.context.panes.code import CodePane
 from lldb_mix.context.types import PaneContext
@@ -178,62 +177,6 @@ class TestCodePaneFormat(unittest.TestCase):
             "=> 0x0000000000001000 b 0x2000 ; "
             "target=0x0000000000002000 mod!target+0x4",
         )
-
-    def test_call_arg_annotation(self):
-        abi = AbiSpec(name="testabi", int_arg_regs=("r0", "r1"))
-        arch = ArchSpec(
-            name="test",
-            ptr_size=8,
-            gpr_names=("r0", "r1"),
-            pc_reg="pc",
-            sp_reg="sp",
-            call_mnemonics=("call",),
-            abi=abi,
-        )
-        snapshot = ContextSnapshot(
-            arch=arch,
-            pc=0x1000,
-            sp=0,
-            regs={"r0": 0x1111, "r1": 0x2222},
-            maps=[],
-            timestamp=0.0,
-        )
-        settings = Settings()
-        settings.enable_color = False
-        settings.show_opcodes = False
-        ctx = PaneContext(
-            snapshot=snapshot,
-            settings=settings,
-            theme=BASE_THEME,
-            last_regs={},
-            reader=None,
-            resolver=None,
-            target=object(),
-            process=None,
-            watchlist=WatchList(),
-            term_width=120,
-            term_height=40,
-        )
-        insts = [
-            Instruction(
-                address=0x1000,
-                bytes=b"\x00",
-                mnemonic="call",
-                operands="0x2000",
-            )
-        ]
-
-        with patch(
-            "lldb_mix.context.panes.code.read_instructions_around",
-            return_value=insts,
-        ):
-            lines = CodePane().render(ctx)
-
-        self.assertIn(
-            "args: r0=0x0000000000001111, r1=0x0000000000002222",
-            lines[1],
-        )
-
 
 if __name__ == "__main__":
     unittest.main()

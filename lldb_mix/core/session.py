@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from lldb_mix.arch.registry import detect_arch
+from lldb_mix.core.state import SETTINGS
 
 
 class Session:
@@ -51,7 +52,7 @@ class Session:
         frame = self.frame()
         if frame:
             reg_names = {r.GetName() for r in self._iter_registers(frame)}
-        return detect_arch(triple, reg_names)
+        return detect_arch(triple, reg_names, SETTINGS.abi)
 
     def read_registers(self) -> dict[str, int]:
         frame = self.frame()

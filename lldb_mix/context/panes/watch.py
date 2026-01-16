@@ -15,6 +15,10 @@ from lldb_mix.deref import (
 
 class WatchPane(Pane):
     name = "watch"
+    column = 1
+
+    def visible(self, ctx: PaneContext) -> bool:
+        return bool(ctx.watchlist.items())
 
     def render(self, ctx: PaneContext) -> list[str]:
         lines = [self.title(ctx)]

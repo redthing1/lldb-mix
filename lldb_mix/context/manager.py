@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from lldb_mix.context.header import render_header
 from lldb_mix.context.layout import layout_panes, render_rows
+from lldb_mix.context.panes.args import ArgsPane
 from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.panes.code import CodePane
 from lldb_mix.context.panes.flow import FlowPane
@@ -23,6 +24,7 @@ class ContextManager:
         self.theme = theme
         self.last_regs: dict[str, int] = {}
         self.panes: dict[str, Pane] = {
+            "args": ArgsPane(),
             "regs": RegsPane(),
             "stack": StackPane(),
             "code": CodePane(),
@@ -64,7 +66,7 @@ class ContextManager:
             pane = self.panes.get(pane_name)
             if not pane:
                 continue
-            if pane_name == "watch" and not WATCHLIST.items():
+            if not pane.visible(ctx):
                 continue
             panes.append(pane)
 

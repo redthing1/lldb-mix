@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import Callable
 
+from lldb_mix.arch.abi import ABI_BY_NAME
 from lldb_mix.core.paths import config_dir, config_path
 from lldb_mix.core.settings import Settings
 from lldb_mix.ui.theme import THEMES
@@ -94,6 +95,12 @@ def format_setting(settings: Settings, key: str) -> str | None:
     return spec.format(value)
 
 
+def reset_settings(settings: Settings) -> None:
+    defaults = Settings()
+    for field in fields(Settings):
+        setattr(settings, field.name, getattr(defaults, field.name))
+
+
 def _settings_dict(settings: Settings) -> dict[str, object]:
     data: dict[str, object] = {}
     for spec in _SPECS:
@@ -179,6 +186,18 @@ def _parse_theme(tokens: list[str]) -> str:
     return name
 
 
+def _parse_abi(tokens: list[str]) -> str:
+    if len(tokens) != 1:
+        raise ValueError("expected one value")
+    name = tokens[0].strip().lower()
+    if name == "auto":
+        return name
+    if name not in ABI_BY_NAME:
+        choices = ", ".join(["auto"] + sorted(ABI_BY_NAME.keys()))
+        raise ValueError(f"unknown abi (choices: {choices})")
+    return name
+
+
 def _fmt_bool(value: object) -> str:
     return "on" if bool(value) else "off"
 
@@ -229,6 +248,10 @@ def _is_theme(value: object) -> bool:
     return isinstance(value, str) and value in THEMES
 
 
+def _is_abi(value: object) -> bool:
+    return isinstance(value, str) and (value == "auto" or value in ABI_BY_NAME)
+
+
 _SPECS: list[SettingSpec] = [
     SettingSpec(
         key="enable_color",
@@ -253,6 +276,14 @@ _SPECS: list[SettingSpec] = [
         parse=_parse_layout,
         format=_fmt_list,
         validate=_is_layout,
+    ),
+    SettingSpec(
+        key="abi",
+        attr="abi",
+        type_name="abi",
+        parse=_parse_abi,
+        format=_fmt_value,
+        validate=_is_abi,
     ),
     SettingSpec(
         key="aggressive_deref",

@@ -14,6 +14,7 @@ from lldb_mix.deref import (
 
 class RegsPane(Pane):
     name = "regs"
+    column = 0
 
     def render(self, ctx: PaneContext) -> list[str]:
         snapshot = ctx.snapshot

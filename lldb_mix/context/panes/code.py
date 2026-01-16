@@ -97,18 +97,6 @@ class CodePane(Pane):
                         ctx.settings,
                     )
                 )
-                if arch.is_call(inst.mnemonic):
-                    call_args = _call_arg_annotations(
-                        snapshot.regs,
-                        arch,
-                        ptr_size,
-                        ctx.reader,
-                        snapshot.maps,
-                        ctx.resolver,
-                        ctx.settings,
-                    )
-                    if call_args:
-                        comment_parts.append(call_args)
                 if is_branch_like(inst.mnemonic):
                     target = resolve_flow_target(
                         inst.mnemonic, inst.operands, snapshot.regs
@@ -197,38 +185,6 @@ def _annotation_for_addr(addr, reader, regions, resolver, settings, ptr_size: in
     if kind in ("string", "symbol", "region"):
         return summary
     return None
-
-
-def _call_arg_annotations(
-    regs: dict[str, int],
-    arch,
-    ptr_size: int,
-    reader,
-    regions,
-    resolver,
-    settings,
-    max_args: int = 4,
-) -> str | None:
-    abi = getattr(arch, "abi", None)
-    if not abi or not getattr(abi, "int_arg_regs", None):
-        return None
-    args: list[str] = []
-    for reg in abi.int_arg_regs[:max_args]:
-        if reg not in regs:
-            continue
-        value = regs[reg]
-        addr_text = format_addr(value, ptr_size)
-        summary = _annotation_for_addr(value, reader, regions, resolver, settings, ptr_size)
-        if summary:
-            args.append(f"{reg}={addr_text}->{summary}")
-        else:
-            args.append(f"{reg}={addr_text}")
-    if not args:
-        return None
-    suffix = ""
-    if len(abi.int_arg_regs) > max_args:
-        suffix = " ..."
-    return f"args: {', '.join(args)}{suffix}"
 
 
 def _compute_mem_addr(

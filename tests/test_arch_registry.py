@@ -18,6 +18,12 @@ class TestArchRegistry(unittest.TestCase):
         self.assertIsNotNone(arch.abi)
         self.assertEqual(arch.abi.name, "win64")
 
+    def test_detect_x64_override(self):
+        arch = detect_arch("x86_64-apple-darwin", [], abi_override="win64")
+        self.assertEqual(arch.name, X64_ARCH.name)
+        self.assertIsNotNone(arch.abi)
+        self.assertEqual(arch.abi.name, "win64")
+
     def test_detect_arm64_from_triple(self):
         arch = detect_arch("arm64-apple-darwin", [])
         self.assertEqual(arch.name, ARM64_ARCH.name)
