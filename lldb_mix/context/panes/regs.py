@@ -6,7 +6,9 @@ from lldb_mix.deref import (
     classify_token,
     deref_chain,
     format_addr,
+    format_region,
     last_addr,
+    find_region,
     region_tag,
     summarize_chain,
 )
@@ -24,6 +26,8 @@ class RegsPane(Pane):
         ptr_size = arch.ptr_size or 8
         reg_names = [name for name in arch.gpr_names if name in regs]
         flags_reg = arch.flags_reg
+        pointer_mode = getattr(ctx.settings, "pointer_mode", "smart")
+        show_all = pointer_mode == "all"
 
         if not reg_names:
             lines.append("(no registers)")
@@ -71,6 +75,20 @@ class RegsPane(Pane):
                         if kind == "symbol":
                             tag = region_tag(addr, snapshot.maps)
                         pointers.append((reg_name, summary, kind, tag))
+                    elif show_all:
+                        region = find_region(value, snapshot.maps)
+                        if region:
+                            tag = format_region(region)
+                            pointers.append(
+                                (reg_name, format_addr(value, ptr_size), "addr", tag)
+                            )
+                elif show_all:
+                    region = find_region(value, snapshot.maps)
+                    if region:
+                        tag = format_region(region)
+                        pointers.append(
+                            (reg_name, format_addr(value, ptr_size), "addr", tag)
+                        )
 
         cell_width = max(length for _, length in entries)
         col_sep = 2
@@ -90,6 +108,8 @@ class RegsPane(Pane):
                 role = "string" if kind == "string" else "symbol"
                 if kind == "region":
                     role = "muted"
+                if kind == "addr":
+                    role = "addr"
                 reg_text = self.style(ctx, f"{reg_name:<{name_width}}", "reg_name")
                 arrow = self.style(ctx, "->", "arrow")
                 summary_text = self.style(ctx, summary, role)

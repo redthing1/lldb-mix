@@ -198,6 +198,17 @@ def _parse_abi(tokens: list[str]) -> str:
     return name
 
 
+def _parse_pointer_mode(tokens: list[str]) -> str:
+    if len(tokens) != 1:
+        raise ValueError("expected one value")
+    value = tokens[0].strip().lower()
+    if value in ("smart", "recognized"):
+        return "smart"
+    if value in ("all", "any"):
+        return "all"
+    raise ValueError("invalid pointer mode (choices: smart, all)")
+
+
 def _fmt_bool(value: object) -> str:
     return "on" if bool(value) else "off"
 
@@ -252,6 +263,10 @@ def _is_abi(value: object) -> bool:
     return isinstance(value, str) and (value == "auto" or value in ABI_BY_NAME)
 
 
+def _is_pointer_mode(value: object) -> bool:
+    return isinstance(value, str) and value in ("smart", "all")
+
+
 _SPECS: list[SettingSpec] = [
     SettingSpec(
         key="enable_color",
@@ -292,6 +307,14 @@ _SPECS: list[SettingSpec] = [
         parse=_parse_bool,
         format=_fmt_bool,
         validate=_is_bool,
+    ),
+    SettingSpec(
+        key="pointers",
+        attr="pointer_mode",
+        type_name="pointers",
+        parse=_parse_pointer_mode,
+        format=_fmt_value,
+        validate=_is_pointer_mode,
     ),
     SettingSpec(
         key="max_deref_depth",
