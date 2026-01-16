@@ -17,8 +17,6 @@ class Settings:
     clear_screen: bool = False
     stack_lines: int = 8
     stack_frame_lines: int = 2
-    memory_window_bytes: int = 64
-    memory_bytes_per_line: int = 16
     code_lines_before: int = 3
     code_lines_after: int = 6
     show_opcodes: bool = True

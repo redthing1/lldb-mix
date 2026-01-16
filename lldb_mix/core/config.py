@@ -365,22 +365,6 @@ _SPECS: list[SettingSpec] = [
         validate=_is_int_nonneg,
     ),
     SettingSpec(
-        key="memory_window_bytes",
-        attr="memory_window_bytes",
-        type_name="int",
-        parse=_parse_int,
-        format=_fmt_value,
-        validate=_is_int_positive,
-    ),
-    SettingSpec(
-        key="memory_bytes_per_line",
-        attr="memory_bytes_per_line",
-        type_name="int",
-        parse=_parse_int,
-        format=_fmt_value,
-        validate=_is_int_positive,
-    ),
-    SettingSpec(
         key="code_lines_before",
         attr="code_lines_before",
         type_name="int",

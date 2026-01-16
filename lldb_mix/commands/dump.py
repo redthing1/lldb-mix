@@ -18,6 +18,8 @@ from lldb_mix.ui.style import colorize
 from lldb_mix.ui.theme import get_theme
 
 
+DEFAULT_DUMP_LEN = 64
+DEFAULT_DUMP_WIDTH = 16
 DEFAULT_WORD_DUMP_LEN = 0x100
 
 
@@ -95,8 +97,8 @@ def cmd_dump(debugger, command, result, internal_dict) -> None:
 
 
 def _parse_args(args: list[str], regs: dict[str, int]) -> tuple[DumpArgs, str | None]:
-    length = SETTINGS.memory_window_bytes
-    width = SETTINGS.memory_bytes_per_line
+    length = DEFAULT_DUMP_LEN
+    width = DEFAULT_DUMP_WIDTH
     length_set = False
     tokens: list[str] = []
 
@@ -144,8 +146,8 @@ def _parse_args(args: list[str], regs: dict[str, int]) -> tuple[DumpArgs, str | 
 def _default_args() -> DumpArgs:
     return DumpArgs(
         addr=0,
-        length=SETTINGS.memory_window_bytes,
-        width=SETTINGS.memory_bytes_per_line,
+        length=DEFAULT_DUMP_LEN,
+        width=DEFAULT_DUMP_WIDTH,
     )
 
 
