@@ -13,6 +13,7 @@ from lldb_mix.core.config import (
 )
 from lldb_mix.core.state import SETTINGS
 from lldb_mix.core.stop_hooks import ensure_stop_hook, remove_stop_hook
+from lldb_mix.core.stop_output import apply_quiet, capture_defaults, restore_defaults
 
 
 def cmd_conf(debugger, command, result, internal_dict) -> None:
@@ -106,10 +107,13 @@ def _handle_default(debugger) -> str:
 
 
 def _sync_auto_context(debugger) -> None:
+    capture_defaults(debugger)
     if SETTINGS.auto_context:
         ensure_stop_hook(debugger, "context")
+        apply_quiet(debugger)
     else:
         remove_stop_hook(debugger, "context")
+        restore_defaults(debugger)
 
 
 def _usage() -> str:

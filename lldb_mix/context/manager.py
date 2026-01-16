@@ -7,6 +7,7 @@ from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.panes.code import CodePane
 from lldb_mix.context.panes.flow import FlowPane
 from lldb_mix.context.panes.regs import RegsPane
+from lldb_mix.context.panes.source import SourcePane
 from lldb_mix.context.panes.stack import StackPane
 from lldb_mix.context.panes.threads import ThreadsPane
 from lldb_mix.context.panes.watch import WatchPane
@@ -31,6 +32,7 @@ class ContextManager:
             "flow": FlowPane(),
             "threads": ThreadsPane(),
             "watch": WatchPane(),
+            "source": SourcePane(),
         }
 
     def render(

@@ -7,7 +7,9 @@ from dataclasses import dataclass, field
 class Settings:
     enable_color: bool = True
     theme: str = "base"
-    layout: list[str] = field(default_factory=lambda: ["regs", "args", "stack", "code"])
+    layout: list[str] = field(
+        default_factory=lambda: ["regs", "args", "stack", "code", "source"]
+    )
     abi: str = "auto"
     aggressive_deref: bool = True
     pointer_mode: str = "smart"
