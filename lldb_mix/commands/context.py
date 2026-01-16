@@ -21,6 +21,21 @@ def _manager() -> ContextManager:
     return _MANAGER
 
 
+def render_context(debugger) -> str:
+    session = Session(debugger)
+    snapshot = capture_snapshot(session)
+    if not snapshot:
+        return "[lldb-mix] context stub (no target)"
+
+    process = session.process()
+    reader = ProcessMemoryReader(process) if process else None
+    target = session.target()
+    resolver = TargetSymbolResolver(target) if target else None
+
+    lines = _manager().render(snapshot, reader, resolver, target, process)
+    return "\n".join(lines)
+
+
 def cmd_context(debugger, command, result, internal_dict) -> None:
     try:
         import lldb
@@ -37,24 +52,7 @@ def cmd_context(debugger, command, result, internal_dict) -> None:
             print(message)
         return
 
-    session = Session(debugger)
-    snapshot = capture_snapshot(session)
-    if not snapshot:
-        message = "[lldb-mix] context stub (no target)"
-        try:
-            result.PutCString(message)
-            result.SetStatus(lldb.eReturnStatusSuccessFinishResult)
-        except Exception:
-            print(message)
-        return
-
-    process = session.process()
-    reader = ProcessMemoryReader(process) if process else None
-    target = session.target()
-    resolver = TargetSymbolResolver(target) if target else None
-
-    lines = _manager().render(snapshot, reader, resolver, target, process)
-    message = "\n".join(lines)
+    message = render_context(debugger)
     try:
         result.PutCString(message)
         result.SetStatus(lldb.eReturnStatusSuccessFinishResult)

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import shlex
 
+from lldb_mix.commands.context import render_context
 from lldb_mix.commands.utils import emit_result, parse_int
 from lldb_mix.core.disasm import read_instructions
 from lldb_mix.core.session import Session
 from lldb_mix.core.snapshot import capture_snapshot
+from lldb_mix.core.state import SETTINGS
 from lldb_mix.deref import format_addr
 
 
@@ -61,7 +63,10 @@ def cmd_skip(debugger, command, result, internal_dict) -> None:
 
     ptr_size = snapshot.arch.ptr_size or 8
     addr_text = format_addr(target_addr, ptr_size)
-    emit_result(result, f"[lldb-mix] skip {count} -> {addr_text}", lldb)
+    message = f"[lldb-mix] skip {count} -> {addr_text}"
+    if SETTINGS.auto_context:
+        message = f"{message}\n{render_context(debugger)}"
+    emit_result(result, message, lldb)
 
 
 def _parse_count(args: list[str]) -> tuple[int, str | None]:
