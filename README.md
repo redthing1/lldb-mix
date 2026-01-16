@@ -1,6 +1,6 @@
 # lldb-mix
 
-Clean, modular LLDB context UI focused on binary-first debugging.
+a modern lldb context ui for binary-first debugging
 
 ## install
 
