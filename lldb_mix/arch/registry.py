@@ -12,6 +12,11 @@ from lldb_mix.arch.view import ArchView
 
 _MATCHERS: list[tuple[ArchProfile, Callable[[ArchInfo], int]]] = []
 _PROFILES_LOADED = False
+_ARCH_FAMILIES: dict[str, tuple[str, ...]] = {
+    "x86_64": ("x86_64", "amd64", "x64"),
+    "arm64": ("arm64", "aarch64"),
+    "riscv": ("riscv", "rv32", "rv64"),
+}
 
 
 def register_profile(profile: ArchProfile, matcher: Callable[[ArchInfo], int]) -> None:
@@ -44,9 +49,12 @@ def detect_arch_info(info: ArchInfo, abi_override: str | None = None) -> ArchVie
 
 def select_profile(info: ArchInfo) -> ArchProfile | None:
     _ensure_profiles_loaded()
+    family = _explicit_family(info)
     best: ArchProfile | None = None
     best_score = 0
     for profile, matcher in _MATCHERS:
+        if family and not _profile_matches_family(profile, family):
+            continue
         try:
             score = int(matcher(info))
         except Exception:
@@ -57,6 +65,23 @@ def select_profile(info: ArchInfo) -> ArchProfile | None:
     if best_score <= 0:
         return None
     return best
+
+
+def _explicit_family(info: ArchInfo) -> str | None:
+    text = f"{info.triple} {info.arch_name}".lower()
+    matches = [
+        name for name, tokens in _ARCH_FAMILIES.items() if any(t in text for t in tokens)
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
+def _profile_matches_family(profile: ArchProfile, family: str) -> bool:
+    name = (profile.name or "").lower()
+    if family == "x86_64":
+        return "x86_64" in name or "amd64" in name or name == "x64"
+    return family in name
 
 
 def _ensure_profiles_loaded() -> None:
