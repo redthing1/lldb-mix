@@ -136,6 +136,11 @@ COMMANDS: tuple[CommandSpec, ...] = (
         handler="lldb_mix.commands.deref.cmd_deref",
         help="Follow pointer chain for an address.",
     ),
+    CommandSpec(
+        name="mixhelp",
+        handler="lldb_mix.commands.mixhelp.cmd_mixhelp",
+        help="List lldb-mix commands.",
+    ),
 )
 
 
