@@ -2,14 +2,9 @@ from __future__ import annotations
 
 import shlex
 
-from lldb_mix.commands.utils import (
-    default_addr,
-    emit_result,
-    eval_expression,
-    parse_int,
-    resolve_addr,
-)
-from lldb_mix.core.disasm import disasm_flavor, read_instructions
+from lldb_mix.commands.utils import emit_result
+from lldb_mix.core.addressing import AddressResolver, parse_int
+from lldb_mix.core.disasm import read_instructions
 from lldb_mix.core.session import Session
 from lldb_mix.core.snapshot import capture_snapshot
 from lldb_mix.core.state import SETTINGS
@@ -36,7 +31,8 @@ def cmd_u(debugger, command, result, internal_dict) -> None:
         emit_result(result, "[lldb-mix] u (no target)", lldb)
         return
 
-    addr, count, error = _parse_args(args, snapshot.regs, session.frame())
+    resolver = AddressResolver(snapshot.regs, snapshot.arch, session.frame())
+    addr, count, error = _parse_args(args, resolver)
     if error:
         emit_result(result, f"[lldb-mix] {error}\n{_usage()}", lldb)
         return
@@ -50,7 +46,7 @@ def cmd_u(debugger, command, result, internal_dict) -> None:
         emit_result(result, "[lldb-mix] u address unavailable", lldb)
         return
 
-    flavor = disasm_flavor(snapshot.arch.name)
+    flavor = snapshot.arch.disasm_flavor()
     insts = read_instructions(target, addr, count, flavor=flavor)
     if not insts:
         emit_result(result, "[lldb-mix] disassembly unavailable", lldb)
@@ -79,23 +75,17 @@ def cmd_u(debugger, command, result, internal_dict) -> None:
 
 def _parse_args(
     args: list[str],
-    regs: dict[str, int],
-    frame,
+    resolver: AddressResolver,
 ) -> tuple[int | None, int, str | None]:
     count = _default_count()
 
     if not args:
-        addr = resolve_addr("pc", regs)
-        if addr is None:
-            addr = default_addr(regs)
-        return addr, count, None
+        return resolver.resolve(None), count, None
 
     if len(args) > 2:
         return None, count, "too many arguments"
 
-    addr = resolve_addr(args[0], regs)
-    if addr is None:
-        addr = eval_expression(frame, args[0])
+    addr = resolver.resolve(args[0])
     if addr is None:
         return None, count, "invalid address or expression"
 

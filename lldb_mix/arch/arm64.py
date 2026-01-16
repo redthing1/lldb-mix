@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from lldb_mix.arch.base import (
-    ArchSpec,
+    ArchProfile,
     BranchDecision,
     ReadPointer,
     parse_target_operand,
     resolve_reg_operand,
 )
+from lldb_mix.arch.info import ArchInfo
+from lldb_mix.arch.registry import register_profile
 
 _CONDITIONS = {
     "eq": (lambda n, z, c, v: z == 1, "z=1"),
@@ -29,7 +31,7 @@ _CONDITIONS = {
 }
 
 
-class Arm64Arch(ArchSpec):
+class Arm64Arch(ArchProfile):
     def format_flags(self, value: int) -> str:
         bits = [
             ("N", 31),
@@ -201,3 +203,24 @@ ARM64_ARCH = Arm64Arch(
     break_bytes=b"\x00\x00\x20\xd4",
     call_mnemonics=("bl", "blr"),
 )
+
+
+def _match_arm64(info: ArchInfo) -> int:
+    score = 0
+    triple = (info.triple or "").lower()
+    arch_name = (info.arch_name or "").lower()
+    if "arm64" in triple or "aarch64" in triple:
+        score += 100
+    if "arm64" in arch_name or "aarch64" in arch_name:
+        score += 50
+    regs = set(info.gpr_names)
+    if {"x0", "x1", "sp", "pc"}.issubset(regs):
+        score += 40
+    elif "x0" in regs or "sp" in regs:
+        score += 20
+    if info.ptr_size == 8:
+        score += 5
+    return score
+
+
+register_profile(ARM64_ARCH, _match_arm64)

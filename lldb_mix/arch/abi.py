@@ -93,6 +93,15 @@ def lookup_abi(name: str) -> AbiSpec | None:
     return ABI_BY_NAME.get((name or "").lower())
 
 
+def arg_reg(abi: AbiSpec | None, index: int) -> str | None:
+    if not abi or index < 0:
+        return None
+    regs = getattr(abi, "int_arg_regs", None)
+    if not regs or index >= len(regs):
+        return None
+    return regs[index]
+
+
 def abi_matches_arch(abi: AbiSpec, arch_name: str) -> bool:
     if not abi or not arch_name:
         return False

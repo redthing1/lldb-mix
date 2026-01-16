@@ -1,76 +1,103 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 from dataclasses import replace
+import importlib
+import pkgutil
+from typing import Callable
 
 from lldb_mix.arch.abi import abi_matches_arch, lookup_abi, select_abi
-from lldb_mix.arch.arm64 import ARM64_ARCH
-from lldb_mix.arch.base import ArchSpec, UNKNOWN_ARCH
-from lldb_mix.arch.riscv import (
-    RISCV32_ABI_ARCH,
-    RISCV32_X_ARCH,
-    RISCV64_ABI_ARCH,
-    RISCV64_X_ARCH,
-)
-from lldb_mix.arch.x64 import X64_ARCH
+from lldb_mix.arch.base import ArchProfile
+from lldb_mix.arch.info import ArchInfo
+from lldb_mix.arch.view import ArchView
+
+_MATCHERS: list[tuple[ArchProfile, Callable[[ArchInfo], int]]] = []
+_PROFILES_LOADED = False
 
 
-def detect_arch(
-    triple: str,
-    reg_names: Iterable[str],
-    abi_override: str | None = None,
-) -> ArchSpec:
-    triple_lower = (triple or "").lower()
-    reg_set = {r.lower() for r in reg_names}
-    if "riscv64" in triple_lower or "riscv32" in triple_lower or "riscv" in triple_lower:
-        arch = _select_riscv(triple_lower, reg_set)
-        return _apply_abi_override(arch, abi_override)
-    if "x86_64" in triple_lower or "amd64" in triple_lower:
-        return _apply_abi_override(_with_abi(X64_ARCH, triple), abi_override)
-    if "arm64" in triple_lower or "aarch64" in triple_lower:
-        return _apply_abi_override(_with_abi(ARM64_ARCH, triple), abi_override)
-    if reg_set.intersection({"ra", "zero", "gp", "tp", "a0"}):
-        arch = _select_riscv(triple_lower, reg_set)
-        return _apply_abi_override(arch, abi_override)
-    if "x31" in reg_set and "cpsr" not in reg_set:
-        arch = _select_riscv(triple_lower, reg_set)
-        return _apply_abi_override(arch, abi_override)
-    if {"x0", "x1", "sp", "pc"}.issubset(reg_set):
-        return _apply_abi_override(_with_abi(ARM64_ARCH, triple), abi_override)
-    if {"rax", "rip", "rsp"}.issubset(reg_set):
-        return _apply_abi_override(_with_abi(X64_ARCH, triple), abi_override)
-
-    return UNKNOWN_ARCH
+def register_profile(profile: ArchProfile, matcher: Callable[[ArchInfo], int]) -> None:
+    _MATCHERS.append((profile, matcher))
 
 
-def _select_riscv(triple_lower: str, reg_set: set[str]) -> ArchSpec:
-    is_32 = "riscv32" in triple_lower or "rv32" in triple_lower
-    is_64 = "riscv64" in triple_lower or "rv64" in triple_lower
-    prefer_abi = bool(reg_set.intersection({"a0", "ra", "sp", "gp", "tp", "zero"}))
-
-    if is_32 and not is_64:
-        return RISCV32_ABI_ARCH if prefer_abi else RISCV32_X_ARCH
-    if is_64 and not is_32:
-        return RISCV64_ABI_ARCH if prefer_abi else RISCV64_X_ARCH
-
-    return RISCV64_ABI_ARCH if prefer_abi else RISCV64_X_ARCH
+def detect_arch(target, frame, abi_override: str | None = None) -> ArchView:
+    info = ArchInfo.from_lldb(target, frame)
+    return detect_arch_info(info, abi_override)
 
 
-def _with_abi(arch: ArchSpec, triple: str) -> ArchSpec:
-    abi = select_abi(triple, arch.name)
+def detect_arch_from_frame(frame, abi_override: str | None = None) -> ArchView:
+    target = None
+    if frame is not None:
+        try:
+            thread = frame.GetThread()
+            process = thread.GetProcess() if thread else None
+            target = process.GetTarget() if process else None
+        except Exception:
+            target = None
+    return detect_arch(target, frame, abi_override)
+
+
+def detect_arch_info(info: ArchInfo, abi_override: str | None = None) -> ArchView:
+    profile = select_profile(info)
+    profile = _with_abi(profile, info)
+    profile = _apply_abi_override(profile, abi_override)
+    return ArchView(info=info, profile=profile)
+
+
+def select_profile(info: ArchInfo) -> ArchProfile | None:
+    _ensure_profiles_loaded()
+    best: ArchProfile | None = None
+    best_score = 0
+    for profile, matcher in _MATCHERS:
+        try:
+            score = int(matcher(info))
+        except Exception:
+            score = 0
+        if score > best_score:
+            best = profile
+            best_score = score
+    if best_score <= 0:
+        return None
+    return best
+
+
+def _ensure_profiles_loaded() -> None:
+    global _PROFILES_LOADED
+    if _PROFILES_LOADED:
+        return
+    # Importing modules registers profiles via register_profile.
+    import lldb_mix.arch as arch_pkg
+
+    excluded = {"abi", "base", "info", "view", "registry"}
+    for module in pkgutil.iter_modules(arch_pkg.__path__):
+        name = module.name
+        if name in excluded:
+            continue
+        importlib.import_module(f"{arch_pkg.__name__}.{name}")
+    _PROFILES_LOADED = True
+
+
+def _with_abi(profile: ArchProfile | None, info: ArchInfo) -> ArchProfile | None:
+    if not profile:
+        return None
+    if profile.abi is not None:
+        return profile
+    abi = select_abi(info.triple, profile.name)
     if not abi:
-        return arch
-    if arch.abi == abi:
-        return arch
-    return replace(arch, abi=abi)
+        return profile
+    if profile.abi == abi:
+        return profile
+    return replace(profile, abi=abi)
 
 
-def _apply_abi_override(arch: ArchSpec, abi_override: str | None) -> ArchSpec:
+def _apply_abi_override(
+    profile: ArchProfile | None, abi_override: str | None
+) -> ArchProfile | None:
+    if not profile:
+        return None
     if not abi_override or abi_override == "auto":
-        return arch
+        return profile
     abi = lookup_abi(abi_override)
-    if not abi or not abi_matches_arch(abi, arch.name):
-        return arch
-    if arch.abi == abi:
-        return arch
-    return replace(arch, abi=abi)
+    if not abi or not abi_matches_arch(abi, profile.name):
+        return profile
+    if profile.abi == abi:
+        return profile
+    return replace(profile, abi=abi)

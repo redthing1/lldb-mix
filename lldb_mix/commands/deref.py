@@ -3,13 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import shlex
 
-from lldb_mix.commands.utils import (
-    default_addr,
-    emit_result,
-    eval_expression,
-    parse_int,
-    resolve_addr,
-)
+from lldb_mix.commands.utils import emit_result
+from lldb_mix.core.addressing import AddressResolver, parse_int
 from lldb_mix.core.memory import ProcessMemoryReader
 from lldb_mix.core.modules import format_module_offset
 from lldb_mix.core.settings import Settings
@@ -59,7 +54,8 @@ def cmd_deref(debugger, command, result, internal_dict) -> None:
         return
 
     frame = session.frame()
-    addr = _resolve_addr(parsed.token, snapshot.regs, frame)
+    resolver = AddressResolver(snapshot.regs, snapshot.arch, frame)
+    addr = resolver.resolve(parsed.token)
     if addr is None:
         emit_result(result, "[lldb-mix] invalid address", lldb)
         return
@@ -139,17 +135,6 @@ def _parse_args(args: list[str]) -> tuple[DerefArgs, str | None]:
 
     token = tokens[0] if tokens else None
     return DerefArgs(token=token, depth=depth), None
-
-
-def _resolve_addr(token: str | None, regs: dict[str, int], frame):
-    if token:
-        addr = resolve_addr(token, regs)
-        if addr is not None:
-            return addr
-        if frame:
-            return eval_expression(frame, token)
-        return None
-    return default_addr(regs)
 
 
 def _settings_with_depth(depth: int | None) -> Settings:

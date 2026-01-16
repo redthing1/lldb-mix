@@ -1,17 +1,18 @@
 import unittest
 
-from lldb_mix.arch.base import ArchSpec
+from lldb_mix.arch.base import ArchProfile
 from lldb_mix.context.panes.regs import RegsPane
 from lldb_mix.context.types import PaneContext
 from lldb_mix.core.settings import Settings
 from lldb_mix.core.snapshot import ContextSnapshot
 from lldb_mix.core.watchlist import WatchList
 from lldb_mix.ui.theme import BASE_THEME
+from tests.arch_test_utils import make_arch_view
 
 
 class TestRegsPane(unittest.TestCase):
     def test_regs_multicolumn_layout(self):
-        arch = ArchSpec(
+        profile = ArchProfile(
             name="test",
             ptr_size=8,
             gpr_names=("r0", "r1", "r2", "r3"),
@@ -19,6 +20,7 @@ class TestRegsPane(unittest.TestCase):
             sp_reg="sp",
             flags_reg=None,
         )
+        arch = make_arch_view(profile, gpr_names=("r0", "r1", "r2", "r3"))
         regs = {"r0": 1, "r1": 2, "r2": 3, "r3": 4}
         snapshot = ContextSnapshot(
             arch=arch,

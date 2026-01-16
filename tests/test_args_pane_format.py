@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from lldb_mix.arch.abi import AbiSpec
-from lldb_mix.arch.base import ArchSpec
+from lldb_mix.arch.base import ArchProfile
 from lldb_mix.context.panes.args import ArgsPane
 from lldb_mix.context.types import PaneContext
 from lldb_mix.core.disasm import Instruction
@@ -10,6 +10,7 @@ from lldb_mix.core.settings import Settings
 from lldb_mix.core.snapshot import ContextSnapshot
 from lldb_mix.core.watchlist import WatchList
 from lldb_mix.ui.theme import BASE_THEME
+from tests.arch_test_utils import make_arch_view
 
 
 class TestArgsPaneFormat(unittest.TestCase):
@@ -40,7 +41,7 @@ class TestArgsPaneFormat(unittest.TestCase):
 
     def test_arg_regs_header(self):
         abi = AbiSpec(name="testabi", int_arg_regs=("r0", "r1"))
-        arch = ArchSpec(
+        profile = ArchProfile(
             name="test",
             ptr_size=8,
             gpr_names=("r0", "r1"),
@@ -48,6 +49,7 @@ class TestArgsPaneFormat(unittest.TestCase):
             sp_reg="sp",
             abi=abi,
         )
+        arch = make_arch_view(profile, gpr_names=("r0", "r1"), ptr_size=8, pc_value=0x1000)
         ctx = self._make_ctx(arch, {"r0": 0x1111, "r1": 0x2222})
 
         lines = ArgsPane().render(ctx)
@@ -59,7 +61,7 @@ class TestArgsPaneFormat(unittest.TestCase):
 
     def test_call_args_header(self):
         abi = AbiSpec(name="testabi", int_arg_regs=("r0", "r1"))
-        arch = ArchSpec(
+        profile = ArchProfile(
             name="test",
             ptr_size=8,
             gpr_names=("r0", "r1"),
@@ -68,6 +70,7 @@ class TestArgsPaneFormat(unittest.TestCase):
             call_mnemonics=("call",),
             abi=abi,
         )
+        arch = make_arch_view(profile, gpr_names=("r0", "r1"), ptr_size=8, pc_value=0x1000)
         ctx = self._make_ctx(
             arch,
             {"r0": 0x1111, "r1": 0x2222},

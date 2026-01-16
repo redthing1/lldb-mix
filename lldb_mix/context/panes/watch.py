@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from lldb_mix.commands.utils import eval_expression, resolve_addr
+from lldb_mix.core.addressing import AddressResolver
 from lldb_mix.context.formatting import deref_summary, format_deref_suffix
 from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.types import PaneContext
@@ -21,6 +21,7 @@ class WatchPane(Pane):
         snapshot = ctx.snapshot
         ptr_size = snapshot.arch.ptr_size or 8
         frame = _selected_frame(ctx.process)
+        resolver = AddressResolver(snapshot.regs, snapshot.arch, frame)
 
         for entry in entries:
             expr_text = self.style(ctx, entry.expr, "reg_name")
@@ -30,9 +31,7 @@ class WatchPane(Pane):
                 label_text = f" ({self.style(ctx, entry.label, 'label')})"
             sep = self.style(ctx, " = ", "label")
 
-            value = resolve_addr(entry.expr, snapshot.regs)
-            if value is None:
-                value = eval_expression(frame, entry.expr)
+            value = resolver.resolve(entry.expr)
             if value is None:
                 unresolved = self.style(ctx, "<unresolved>", "muted")
                 lines.append(f"  {idx_text} {expr_text}{label_text}{sep}{unresolved}")

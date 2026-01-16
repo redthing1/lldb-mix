@@ -3,14 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 import time
 
-from lldb_mix.arch.base import ArchSpec, UNKNOWN_ARCH
+from lldb_mix.arch.view import ArchView
 from lldb_mix.core.memory import MemoryRegion, read_memory_regions
 from lldb_mix.core.session import Session
 
 
 @dataclass(frozen=True)
 class ContextSnapshot:
-    arch: ArchSpec
+    arch: ArchView
     pc: int | None
     sp: int | None
     regs: dict[str, int]
@@ -28,10 +28,14 @@ def capture_snapshot(session: Session) -> ContextSnapshot | None:
     if not session:
         return None
 
-    arch = session.arch() or UNKNOWN_ARCH
+    arch = session.arch()
     regs = session.read_registers()
-    pc = regs.get(arch.pc_reg) if arch.pc_reg and arch.pc_reg in regs else None
-    sp = regs.get(arch.sp_reg) if arch.sp_reg and arch.sp_reg in regs else None
+    pc = arch.pc_value
+    if pc is None and arch.pc_reg:
+        pc = regs.get(arch.pc_reg)
+    sp = arch.sp_value
+    if sp is None and arch.sp_reg:
+        sp = regs.get(arch.sp_reg)
     process = session.process()
     maps = read_memory_regions(process) if process else []
 

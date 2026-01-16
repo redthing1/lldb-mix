@@ -3,12 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lldb_mix.core.memory import ProcessMemoryReader
-from lldb_mix.commands.utils import (
-    default_addr,
-    emit_result,
-    parse_int,
-    resolve_addr,
-)
+from lldb_mix.commands.utils import emit_result
+from lldb_mix.core.addressing import AddressResolver, parse_int
 from lldb_mix.core.session import Session
 from lldb_mix.core.snapshot import capture_snapshot
 from lldb_mix.core.state import SETTINGS
@@ -54,7 +50,8 @@ def cmd_dump(debugger, command, result, internal_dict) -> None:
         emit_result(result, "[lldb-mix] dump (no target)", lldb)
         return
 
-    parsed, error = _parse_args(args, snapshot.regs)
+    resolver = AddressResolver(snapshot.regs, snapshot.arch, session.frame())
+    parsed, error = _parse_args(args, resolver)
     if error:
         emit_result(result, f"[lldb-mix] {error}\n{_usage()}", lldb)
         return
@@ -96,7 +93,9 @@ def cmd_dump(debugger, command, result, internal_dict) -> None:
     emit_result(result, "\n".join(lines), lldb)
 
 
-def _parse_args(args: list[str], regs: dict[str, int]) -> tuple[DumpArgs, str | None]:
+def _parse_args(
+    args: list[str], resolver: AddressResolver
+) -> tuple[DumpArgs, str | None]:
     length = DEFAULT_DUMP_LEN
     width = DEFAULT_DUMP_WIDTH
     length_set = False
@@ -128,7 +127,7 @@ def _parse_args(args: list[str], regs: dict[str, int]) -> tuple[DumpArgs, str | 
     if len(tokens) > 2:
         return _default_args(), "too many arguments"
 
-    addr = resolve_addr(tokens[0], regs) if tokens else default_addr(regs)
+    addr = resolver.resolve(tokens[0]) if tokens else resolver.resolve(None)
     if addr is None:
         return _default_args(), "invalid address or register"
 
@@ -195,7 +194,8 @@ def _cmd_word_dump(
         emit_result(result, f"[lldb-mix] {label} (no target)", lldb)
         return
 
-    parsed, error = _parse_simple_args(args, snapshot.regs)
+    resolver = AddressResolver(snapshot.regs, snapshot.arch, session.frame())
+    parsed, error = _parse_simple_args(args, resolver)
     if error:
         emit_result(result, f"[lldb-mix] {error}\n{_usage_word(label)}", lldb)
         return
@@ -240,7 +240,7 @@ def _cmd_word_dump(
 
 
 def _parse_simple_args(
-    args: list[str], regs: dict[str, int]
+    args: list[str], resolver: AddressResolver
 ) -> tuple[SimpleDumpArgs, str | None]:
     if len(args) > 2:
         return (
@@ -248,7 +248,7 @@ def _parse_simple_args(
             "too many arguments",
         )
 
-    addr = resolve_addr(args[0], regs) if args else default_addr(regs)
+    addr = resolver.resolve(args[0]) if args else resolver.resolve(None)
     if addr is None:
         return (
             SimpleDumpArgs(addr=0, length=DEFAULT_WORD_DUMP_LEN),

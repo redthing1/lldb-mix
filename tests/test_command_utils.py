@@ -1,6 +1,8 @@
 import unittest
 
-from lldb_mix.commands.utils import default_addr, parse_int, resolve_addr
+from lldb_mix.core.addressing import default_addr, parse_int, resolve_addr
+from lldb_mix.arch.riscv import RISCV64_X_ARCH
+from tests.arch_test_utils import make_arch_view
 
 
 class TestCommandUtils(unittest.TestCase):
@@ -25,6 +27,11 @@ class TestCommandUtils(unittest.TestCase):
         regs = {"rsp": 0x1111}
         self.assertEqual(resolve_addr("sp", regs), 0x1111)
         self.assertEqual(resolve_addr("$sp", regs), 0x1111)
+
+    def test_resolve_addr_arch_alias(self):
+        regs = {"x2": 0x1111}
+        arch = make_arch_view(RISCV64_X_ARCH, gpr_names=("x2",), ptr_size=8)
+        self.assertEqual(resolve_addr("sp", regs, arch), 0x1111)
 
     def test_resolve_addr_pc_alias(self):
         regs = {"rip": 0x2222}

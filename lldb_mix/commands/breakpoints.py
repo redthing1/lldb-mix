@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import shlex
 
-from lldb_mix.commands.utils import emit_result, eval_expression, resolve_addr
+from lldb_mix.commands.utils import emit_result
+from lldb_mix.core.addressing import AddressResolver, parse_int
 from lldb_mix.core.modules import find_module, module_base, module_name
-from lldb_mix.core.disasm import disasm_flavor, read_instructions
+from lldb_mix.core.disasm import read_instructions
 from lldb_mix.core.session import Session
 from lldb_mix.core.snapshot import capture_snapshot
 from lldb_mix.deref import format_addr
@@ -23,7 +24,7 @@ def cmd_bpm(debugger, command, result, internal_dict) -> None:
         return
 
     module_token = args[0]
-    offset = _parse_int(args[1])
+    offset = parse_int(args[1])
     if offset is None:
         emit_result(result, "[lldb-mix] invalid offset\n" + _usage(), lldb)
         return
@@ -63,13 +64,6 @@ def _usage() -> str:
     return "[lldb-mix] usage: bpm <module> <offset>"
 
 
-def _parse_int(text: str) -> int | None:
-    try:
-        return int(text, 0)
-    except ValueError:
-        return None
-
-
 def cmd_bpt(debugger, command, result, internal_dict) -> None:
     try:
         import lldb
@@ -89,9 +83,8 @@ def cmd_bpt(debugger, command, result, internal_dict) -> None:
         emit_result(result, "[lldb-mix] bpt (no target)", lldb)
         return
 
-    addr = resolve_addr(args[0], snapshot.regs)
-    if addr is None:
-        addr = eval_expression(frame, args[0])
+    resolver = AddressResolver(snapshot.regs, snapshot.arch, frame)
+    addr = resolver.resolve(args[0])
     if addr is None:
         emit_result(result, f"[lldb-mix] invalid address\n{_usage_bpt()}", lldb)
         return
@@ -149,7 +142,7 @@ def cmd_bpn(debugger, command, result, internal_dict) -> None:
         emit_result(result, "[lldb-mix] bpn pc unavailable", lldb)
         return
 
-    flavor = disasm_flavor(snapshot.arch.name)
+    flavor = snapshot.arch.disasm_flavor()
     insts = read_instructions(target, pc, 1, flavor=flavor)
     size = len(insts[0].bytes) if insts else snapshot.arch.max_inst_bytes
     if size <= 0:

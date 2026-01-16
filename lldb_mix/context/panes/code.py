@@ -3,11 +3,11 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from lldb_mix.arch.base import ArchSpec
+from lldb_mix.arch.view import ArchView
 from lldb_mix.context.formatting import deref_summary
 from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.types import PaneContext
-from lldb_mix.core.disasm import disasm_flavor, read_instructions, read_instructions_around
+from lldb_mix.core.disasm import read_instructions, read_instructions_around
 from lldb_mix.core.flow import branch_decision, is_branch_like, resolve_flow_target
 from lldb_mix.deref import format_addr, format_symbol
 from lldb_mix.ui.text import pad_ansi, truncate_ansi, visible_len
@@ -51,7 +51,7 @@ class CodePane(Pane):
         if arch.flags_reg:
             flags = snapshot.regs.get(arch.flags_reg, 0)
 
-        flavor = disasm_flavor(arch.name)
+        flavor = arch.disasm_flavor()
         insts = read_instructions_around(
             ctx.target,
             pc,
@@ -199,8 +199,11 @@ def _compute_mem_addr(
     operands: str,
     regs: dict[str, int],
     pattern: re.Pattern[str],
-    arch: ArchSpec,
+    arch: ArchView,
 ) -> int | None:
+    targets = arch.mem_operand_targets(operands, regs)
+    if targets:
+        return targets[0]
     for expr in re.findall(r"\[([^\]]+)\]", operands):
         cleaned = expr.replace("#", "").replace("!", "")
         regs_in = _regs_in_text(cleaned, regs, pattern, arch)
@@ -218,7 +221,7 @@ def _regs_in_text(
     text: str,
     regs: dict[str, int],
     pattern: re.Pattern[str],
-    arch: ArchSpec,
+    arch: ArchView,
 ) -> list[str]:
     reg_map = {name.lower(): name for name in regs}
     reg_map.update(_alias_registers(arch, regs))
@@ -273,7 +276,7 @@ def _branch_taken_hint(
     return "taken" if taken else "not taken"
 
 
-def _alias_registers(arch: ArchSpec, regs: dict[str, int]) -> dict[str, str]:
+def _alias_registers(arch: ArchView, regs: dict[str, int]) -> dict[str, str]:
     try:
         return arch.register_aliases(regs)
     except Exception:

@@ -1,43 +1,80 @@
 import unittest
 
 from lldb_mix.arch.arm64 import ARM64_ARCH
-from lldb_mix.arch.registry import detect_arch
+from lldb_mix.arch.info import ArchInfo
+from lldb_mix.arch.registry import detect_arch_info
 from lldb_mix.arch.x64 import X64_ARCH
 
 
 class TestArchRegistry(unittest.TestCase):
     def test_detect_x64_from_triple(self):
-        arch = detect_arch("x86_64-apple-darwin", [])
+        info = ArchInfo.from_register_sets(
+            triple="x86_64-apple-darwin",
+            arch_name="x86_64",
+            ptr_size=8,
+            reg_sets={"General Purpose Registers": ["rax", "rip", "rsp"]},
+        )
+        arch = detect_arch_info(info)
         self.assertEqual(arch.name, X64_ARCH.name)
         self.assertIsNotNone(arch.abi)
         self.assertEqual(arch.abi.name, "sysv")
 
     def test_detect_x64_win64(self):
-        arch = detect_arch("x86_64-pc-windows-msvc", [])
+        info = ArchInfo.from_register_sets(
+            triple="x86_64-pc-windows-msvc",
+            arch_name="x86_64",
+            ptr_size=8,
+            reg_sets={"General Purpose Registers": ["rax", "rip", "rsp"]},
+        )
+        arch = detect_arch_info(info)
         self.assertEqual(arch.name, X64_ARCH.name)
         self.assertIsNotNone(arch.abi)
         self.assertEqual(arch.abi.name, "win64")
 
     def test_detect_x64_override(self):
-        arch = detect_arch("x86_64-apple-darwin", [], abi_override="win64")
+        info = ArchInfo.from_register_sets(
+            triple="x86_64-apple-darwin",
+            arch_name="x86_64",
+            ptr_size=8,
+            reg_sets={"General Purpose Registers": ["rax", "rip", "rsp"]},
+        )
+        arch = detect_arch_info(info, abi_override="win64")
         self.assertEqual(arch.name, X64_ARCH.name)
         self.assertIsNotNone(arch.abi)
         self.assertEqual(arch.abi.name, "win64")
 
     def test_detect_arm64_from_triple(self):
-        arch = detect_arch("arm64-apple-darwin", [])
+        info = ArchInfo.from_register_sets(
+            triple="arm64-apple-darwin",
+            arch_name="arm64",
+            ptr_size=8,
+            reg_sets={"General Purpose Registers": ["x0", "x1", "sp", "pc"]},
+        )
+        arch = detect_arch_info(info)
         self.assertEqual(arch.name, ARM64_ARCH.name)
         self.assertIsNotNone(arch.abi)
         self.assertEqual(arch.abi.name, "aapcs64")
 
     def test_detect_x64_from_regs(self):
-        arch = detect_arch("", ["rax", "rip", "rsp"])
+        info = ArchInfo.from_register_sets(
+            triple="",
+            arch_name="",
+            ptr_size=8,
+            reg_sets={"General Purpose Registers": ["rax", "rip", "rsp"]},
+        )
+        arch = detect_arch_info(info)
         self.assertEqual(arch.name, X64_ARCH.name)
         self.assertIsNotNone(arch.abi)
         self.assertEqual(arch.abi.name, "sysv")
 
     def test_detect_arm64_from_regs(self):
-        arch = detect_arch("", ["x0", "x1", "sp", "pc"])
+        info = ArchInfo.from_register_sets(
+            triple="",
+            arch_name="",
+            ptr_size=8,
+            reg_sets={"General Purpose Registers": ["x0", "x1", "sp", "pc"]},
+        )
+        arch = detect_arch_info(info)
         self.assertEqual(arch.name, ARM64_ARCH.name)
         self.assertIsNotNone(arch.abi)
         self.assertEqual(arch.abi.name, "aapcs64")

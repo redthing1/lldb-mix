@@ -16,8 +16,11 @@ class BranchDecision:
     kind: str
 
 
+_REG_BOUNDARY = r"(?<![A-Za-z0-9_])(?:{name})(?![A-Za-z0-9_])"
+
+
 @dataclass(frozen=True)
-class ArchSpec:
+class ArchProfile:
     name: str
     ptr_size: int
     gpr_names: tuple[str, ...]
@@ -31,6 +34,12 @@ class ArchSpec:
     break_bytes: bytes = b""
     abi: AbiSpec | None = None
     call_mnemonics: tuple[str, ...] = ()
+
+    def disasm_flavor(self) -> str:
+        name = (self.name or "").lower()
+        if name.startswith("x86") or name in {"x64", "amd64", "i386"}:
+            return "intel"
+        return ""
 
     def format_flags(self, value: int) -> str:
         return ""
@@ -107,6 +116,32 @@ class ArchSpec:
         _ = regs
         return {}
 
+    def mem_operand_targets(self, operands: str, regs: dict[str, int]) -> list[int]:
+        if not operands or not regs:
+            return []
+        aliases = self.register_aliases(regs)
+        reg_map = {name.lower(): name for name in regs}
+        reg_map.update(aliases)
+        reg_names = sorted(reg_map.keys(), key=len, reverse=True)
+        if not reg_names:
+            return []
+        pattern = re.compile(
+            _REG_BOUNDARY.format(name="|".join(re.escape(name) for name in reg_names)),
+            re.IGNORECASE,
+        )
+        targets: list[int] = []
+        for expr in re.findall(r"\[([^\]]+)\]", operands):
+            cleaned = expr.replace("#", "").replace("!", "")
+            regs_in = _regs_in_text(cleaned, pattern, reg_map)
+            if len(regs_in) != 1:
+                continue
+            base = regs.get(regs_in[0])
+            if base is None:
+                continue
+            offset = _parse_offset(cleaned)
+            targets.append(base + offset)
+        return targets
+
 
 def parse_immediate(text: str) -> int | None:
     if not text:
@@ -159,13 +194,31 @@ def parse_target_operand(
         return parsed
     return resolve_reg_operand(op, regs, aliases)
 
+def _regs_in_text(
+    text: str,
+    pattern: re.Pattern[str],
+    reg_map: dict[str, str],
+) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for match in pattern.finditer(text):
+        key = match.group(0).lower()
+        canon = reg_map.get(key)
+        if not canon or canon in seen:
+            continue
+        seen.add(canon)
+        out.append(canon)
+    return out
 
-UNKNOWN_ARCH = ArchSpec(
-    name="unknown",
-    ptr_size=0,
-    gpr_names=(),
-    pc_reg="",
-    sp_reg="",
-    flags_reg=None,
-    special_regs=(),
-)
+
+def _parse_offset(expr: str) -> int:
+    match = re.search(r"([+-])\\s*(0x[0-9a-fA-F]+|\\d+)", expr)
+    if not match:
+        return 0
+    sign = -1 if match.group(1) == "-" else 1
+    try:
+        value = int(match.group(2), 0)
+    except ValueError:
+        return 0
+    return sign * value
+

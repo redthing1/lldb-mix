@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from lldb_mix.core.addressing import parse_int
 from lldb_mix.core.modules import (
     find_module,
     module_base,
@@ -98,10 +99,10 @@ def _apply_spec(target, spec: BreakpointSpec):
         module = find_module(target, spec.module)
         if module:
             base = module_base(target, module)
-            offset = _parse_int(spec.offset)
+            offset = parse_int(spec.offset)
             if base is not None and offset is not None:
                 return target.BreakpointCreateByAddress(base + offset)
-    addr = _parse_int(spec.address) if spec.address else None
+    addr = parse_int(spec.address) if spec.address else None
     if addr is not None:
         return target.BreakpointCreateByAddress(addr)
     return None
@@ -185,9 +186,3 @@ def _location_address(target, location) -> int | None:
 def _format_hex(value: int) -> str:
     return f"0x{value:x}"
 
-
-def _parse_int(text: str) -> int | None:
-    try:
-        return int(text, 0)
-    except (TypeError, ValueError):
-        return None

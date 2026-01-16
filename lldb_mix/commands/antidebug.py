@@ -4,8 +4,11 @@ import shlex
 import struct
 
 from lldb_mix.commands.utils import emit_result
-from lldb_mix.core.disasm import disasm_flavor, read_instructions
+from lldb_mix.arch.registry import detect_arch_from_frame
+from lldb_mix.core.disasm import read_instructions
+from lldb_mix.core.regs import find_register, read_register_u64, set_register_value
 from lldb_mix.core.session import Session
+from lldb_mix.core.state import SETTINGS
 
 
 ANTIDEBUG_SYSCTL_OLDP: list[int] = []
@@ -86,17 +89,22 @@ def antidebug_callback_step1(frame, bp_loc, internal_dict):
     except Exception:
         return 0
 
-    arch = _arch_kind(frame)
+    arch = detect_arch_from_frame(frame, SETTINGS.abi)
     if arch is None:
+        return 0
+    abi = getattr(arch, "abi", None)
+    if not abi or not getattr(abi, "int_arg_regs", None):
         return 0
 
     process = frame.GetThread().GetProcess()
     target = process.GetTarget()
     error = lldb.SBError()
 
-    mib_reg = "rdi" if arch == "x64" else "x0"
-    oldp_reg = "rdx" if arch == "x64" else "x2"
-    mib_addr = _reg_u64(frame, mib_reg)
+    mib_reg = arch.arg_reg(0)
+    oldp_reg = arch.arg_reg(2)
+    if not mib_reg or not oldp_reg:
+        return 0
+    mib_addr = read_register_u64(frame, mib_reg)
     if mib_addr is None:
         return 0
 
@@ -111,11 +119,11 @@ def antidebug_callback_step1(frame, bp_loc, internal_dict):
         return 0
 
     if mib0 == 1 and mib1 == 14 and mib2 == 1:
-        oldp = _reg_u64(frame, oldp_reg)
+        oldp = read_register_u64(frame, oldp_reg)
         if oldp:
             ANTIDEBUG_SYSCTL_OLDP.append(oldp)
             pc = frame.GetPC()
-            flavor = disasm_flavor(arch)
+            flavor = arch.disasm_flavor()
             insts = read_instructions(target, pc, 64, flavor=flavor)
             for inst in insts:
                 if inst.mnemonic.lower().startswith("ret"):
@@ -161,19 +169,26 @@ def antidebug_ptrace_callback(frame, bp_loc, internal_dict):
     if frame is None:
         return 0
 
-    arch = _arch_kind(frame)
+    arch = detect_arch_from_frame(frame, SETTINGS.abi)
     if arch is None:
         return 0
+    abi = getattr(arch, "abi", None)
+    if not abi or not getattr(abi, "int_arg_regs", None):
+        return 0
 
-    request_reg = "rdi" if arch == "x64" else "x0"
+    request_reg = arch.arg_reg(0)
+    if not request_reg:
+        return 0
     request = _reg_u64(frame, request_reg)
     if request != 31:
         frame.GetThread().GetProcess().Continue()
         return 0
 
-    ret_reg = "rax" if arch == "x64" else "x0"
-    reg = _reg_value(frame, ret_reg)
-    if reg and _set_reg_value(reg, "0x0"):
+    ret_reg = getattr(abi, "return_reg", None) or getattr(arch, "return_reg", None)
+    if not ret_reg:
+        return 0
+    reg = find_register(frame, ret_reg)
+    if reg and set_register_value(reg, "0x0"):
         thread = frame.GetThread()
         thread.ReturnFromFrame(frame, reg)
     frame.GetThread().GetProcess().Continue()
@@ -184,64 +199,23 @@ def antidebug_task_exception_ports_callback(frame, bp_loc, internal_dict):
     if frame is None:
         return 0
 
-    arch = _arch_kind(frame)
+    arch = detect_arch_from_frame(frame, SETTINGS.abi)
     if arch is None:
         return 0
+    abi = getattr(arch, "abi", None)
+    if not abi or not getattr(abi, "int_arg_regs", None):
+        return 0
 
-    mask_reg = "rsi" if arch == "x64" else "x1"
-    mask = _reg_u64(frame, mask_reg)
+    mask_reg = arch.arg_reg(1)
+    if not mask_reg:
+        return 0
+    mask = read_register_u64(frame, mask_reg)
     if mask:
-        reg = _reg_value(frame, mask_reg)
+        reg = find_register(frame, mask_reg)
         if reg:
-            _set_reg_value(reg, "0x0")
+            set_register_value(reg, "0x0")
     frame.GetThread().GetProcess().Continue()
     return 0
-
-
-def _arch_kind(frame) -> str | None:
-    if _reg_value(frame, "rdi") is not None:
-        return "x64"
-    if _reg_value(frame, "x0") is not None:
-        return "arm64"
-    return None
-
-
-def _reg_u64(frame, name: str) -> int | None:
-    reg = _reg_value(frame, name)
-    if reg is None:
-        return None
-    try:
-        return int(reg.GetValueAsUnsigned())
-    except Exception:
-        try:
-            return int(reg.GetValue(), 0)
-        except Exception:
-            return None
-
-
-def _reg_value(frame, name: str):
-    try:
-        reg = frame.FindRegister(name)
-    except Exception:
-        return None
-    if not reg or not reg.IsValid():
-        return None
-    return reg
-
-
-def _set_reg_value(reg, value: str) -> bool:
-    try:
-        return bool(reg.SetValueFromCString(value))
-    except Exception:
-        try:
-            import lldb
-        except Exception:
-            return False
-        error = lldb.SBError()
-        try:
-            return bool(reg.SetValueFromCString(value, error))
-        except Exception:
-            return False
 
 
 def _register_bp(target, symbol: str, module: str, callback: str) -> tuple[str, int]:

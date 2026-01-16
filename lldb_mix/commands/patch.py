@@ -3,12 +3,8 @@ from __future__ import annotations
 import shlex
 
 from lldb_mix.commands.context import render_context_if_enabled
-from lldb_mix.commands.utils import (
-    emit_result,
-    eval_expression,
-    parse_int,
-    resolve_addr,
-)
+from lldb_mix.commands.utils import emit_result
+from lldb_mix.core.addressing import AddressResolver, parse_int
 from lldb_mix.core.patches import format_bytes, parse_hex_bytes
 from lldb_mix.core.session import Session
 from lldb_mix.core.snapshot import capture_snapshot
@@ -47,9 +43,10 @@ def cmd_patch(debugger, command, result, internal_dict) -> None:
 
     arch = snapshot.arch if snapshot else session.arch()
     regs = snapshot.regs if snapshot else {}
+    resolver = AddressResolver(regs, arch, frame)
 
     if subcmd == "restore":
-        addr, error = _parse_addr(args[1:], regs, frame)
+        addr, error = _parse_addr(args[1:], resolver)
         if error:
             emit_result(result, f"[lldb-mix] {error}\n{_usage()}", lldb)
             return
@@ -70,7 +67,7 @@ def cmd_patch(debugger, command, result, internal_dict) -> None:
         emit_result(result, message, lldb)
         return
 
-    addr, count, payload, error = _parse_patch_args(subcmd, args[1:], regs, frame, arch)
+    addr, count, payload, error = _parse_patch_args(subcmd, args[1:], resolver, arch)
     if error:
         emit_result(result, f"[lldb-mix] {error}\n{_usage()}", lldb)
         return
@@ -105,22 +102,22 @@ def cmd_patch(debugger, command, result, internal_dict) -> None:
     emit_result(result, summary, lldb)
 
 
-def _parse_addr(tokens: list[str], regs: dict[str, int], frame):
+def _parse_addr(tokens: list[str], resolver: AddressResolver):
     if len(tokens) != 1:
         return 0, "invalid address"
-    addr = _resolve_addr(tokens[0], regs, frame)
+    addr = resolver.resolve(tokens[0])
     if addr is None:
         return 0, "invalid address"
     return addr, None
 
 
 def _parse_patch_args(
-    subcmd: str, tokens: list[str], regs: dict[str, int], frame, arch
+    subcmd: str, tokens: list[str], resolver: AddressResolver, arch
 ):
     if subcmd == "write":
         if len(tokens) < 2:
             return 0, 0, b"", "missing write arguments"
-        addr = _resolve_addr(tokens[0], regs, frame)
+        addr = resolver.resolve(tokens[0])
         if addr is None:
             return 0, 0, b"", "invalid address"
         payload = parse_hex_bytes(" ".join(tokens[1:]))
@@ -131,7 +128,7 @@ def _parse_patch_args(
     if subcmd in ("nop", "int3", "null"):
         if len(tokens) not in (1, 2):
             return 0, 0, b"", "invalid patch arguments"
-        addr = _resolve_addr(tokens[0], regs, frame)
+        addr = resolver.resolve(tokens[0])
         if addr is None:
             return 0, 0, b"", "invalid address"
         count = 1
@@ -150,15 +147,6 @@ def _parse_patch_args(
         return addr, count, unit * count, None
 
     return 0, 0, b"", "unknown patch subcommand"
-
-
-def _resolve_addr(token: str, regs: dict[str, int], frame):
-    addr = resolve_addr(token, regs)
-    if addr is not None:
-        return addr
-    if frame:
-        return eval_expression(frame, token)
-    return None
 
 
 def _read_memory(process, addr: int, size: int, lldb_module):

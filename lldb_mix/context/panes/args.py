@@ -3,7 +3,7 @@ from __future__ import annotations
 from lldb_mix.context.formatting import deref_summary, format_deref_suffix
 from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.types import PaneContext
-from lldb_mix.core.disasm import disasm_flavor, read_instructions
+from lldb_mix.core.disasm import read_instructions
 from lldb_mix.core.flow import resolve_flow_target
 from lldb_mix.deref import format_addr, format_symbol
 
@@ -102,7 +102,7 @@ class ArgsPane(Pane):
 def _current_call_inst(ctx: PaneContext, arch, pc: int | None):
     if not ctx.target or pc is None:
         return None
-    flavor = disasm_flavor(arch.name)
+    flavor = arch.disasm_flavor()
     try:
         insts = read_instructions(ctx.target, pc, 1, flavor)
     except Exception:

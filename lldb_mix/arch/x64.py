@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from lldb_mix.arch.base import (
-    ArchSpec,
+    ArchProfile,
     BranchDecision,
     ReadPointer,
     parse_target_operand,
 )
+from lldb_mix.arch.info import ArchInfo
+from lldb_mix.arch.registry import register_profile
 
 _FLAG_BITS = {
     "cf": 0,
@@ -63,7 +65,7 @@ _LOOP_MNEMONICS = {
 _JCXZ_MNEMONICS = {"jcxz", "jecxz", "jrcxz"}
 
 
-class X64Arch(ArchSpec):
+class X64Arch(ArchProfile):
     def format_flags(self, value: int) -> str:
         bits = [
             ("O", _FLAG_BITS["of"]),
@@ -288,3 +290,24 @@ X64_ARCH = X64Arch(
     break_bytes=b"\xcc",
     call_mnemonics=("call", "callq"),
 )
+
+
+def _match_x64(info: ArchInfo) -> int:
+    score = 0
+    triple = (info.triple or "").lower()
+    arch_name = (info.arch_name or "").lower()
+    if "x86_64" in triple or "amd64" in triple:
+        score += 100
+    if "x86_64" in arch_name or "amd64" in arch_name or arch_name == "x64":
+        score += 50
+    regs = set(info.gpr_names)
+    if {"rax", "rip", "rsp"}.issubset(regs):
+        score += 40
+    elif "rax" in regs or "rip" in regs:
+        score += 20
+    if info.ptr_size == 8:
+        score += 5
+    return score
+
+
+register_profile(X64_ARCH, _match_x64)

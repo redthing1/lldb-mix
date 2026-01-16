@@ -4,13 +4,15 @@ import re
 
 from lldb_mix.arch.abi import RISCV_ABI, RISCV_X_ABI
 from lldb_mix.arch.base import (
-    ArchSpec,
+    ArchProfile,
     BranchDecision,
     ReadPointer,
     parse_immediate,
     parse_leading_int,
     resolve_reg_operand,
 )
+from lldb_mix.arch.info import ArchInfo
+from lldb_mix.arch.registry import register_profile
 
 RISCV_ALIAS_TO_X = {
     "zero": "x0",
@@ -159,7 +161,7 @@ _BASE_OFFSET_RE = re.compile(
 )
 
 
-class RiscvArch(ArchSpec):
+class RiscvArch(ArchProfile):
     def is_unconditional_branch(self, mnemonic: str) -> bool:
         mnem = mnemonic.lower()
         return mnem in {"b", "j", "jr", "c.j", "c.jr"}
@@ -319,6 +321,20 @@ class RiscvArch(ArchSpec):
                 aliases[reg] = alias
         return aliases
 
+    def mem_operand_targets(self, operands: str, regs: dict[str, int]) -> list[int]:
+        if not operands or not regs:
+            return []
+        aliases = self.register_aliases(regs)
+        targets: list[int] = []
+        parts = [part.strip() for part in operands.split(",") if part.strip()]
+        for part in parts:
+            base = _parse_base_offset(part, regs, aliases)
+            if base is not None:
+                targets.append(base)
+        if targets:
+            return targets
+        return super().mem_operand_targets(operands, regs)
+
 
 RISCV32_X_ARCH = RiscvArch(
     name="riscv32",
@@ -383,6 +399,43 @@ RISCV64_ABI_ARCH = RiscvArch(
     abi=RISCV_ABI,
     call_mnemonics=_CALL_MNEMONICS,
 )
+
+
+def _match_riscv(info: ArchInfo, bits: int, prefer_abi: bool) -> int:
+    score = 0
+    triple = (info.triple or "").lower()
+    arch_name = (info.arch_name or "").lower()
+    regs = set(info.gpr_names)
+
+    if "riscv" in triple or "riscv" in arch_name or "rv" in triple:
+        score += 40
+    if bits == 64 and ("riscv64" in triple or "rv64" in triple):
+        score += 60
+    if bits == 32 and ("riscv32" in triple or "rv32" in triple):
+        score += 60
+    if info.ptr_size == 8 and bits == 64:
+        score += 5
+    if info.ptr_size == 4 and bits == 32:
+        score += 5
+
+    if prefer_abi:
+        if regs.intersection({"a0", "a1", "ra", "sp", "gp", "tp", "zero"}):
+            score += 30
+        elif regs.intersection({"x10", "x1", "x2"}):
+            score -= 5
+    else:
+        if regs.intersection({"x0", "x1", "x2", "x10"}):
+            score += 30
+        elif regs.intersection({"a0", "ra", "sp"}):
+            score -= 5
+
+    return score
+
+
+register_profile(RISCV32_ABI_ARCH, lambda info: _match_riscv(info, 32, True))
+register_profile(RISCV32_X_ARCH, lambda info: _match_riscv(info, 32, False))
+register_profile(RISCV64_ABI_ARCH, lambda info: _match_riscv(info, 64, True))
+register_profile(RISCV64_X_ARCH, lambda info: _match_riscv(info, 64, False))
 
 
 def _parse_target_operand(

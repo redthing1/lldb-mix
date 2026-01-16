@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from lldb_mix.arch.base import ArchSpec
+from lldb_mix.arch.view import ArchView
 
 
 @dataclass(frozen=True)
@@ -14,8 +14,15 @@ class Instruction:
     operands: str
 
 
-def disasm_flavor(arch_name: str | None) -> str:
-    name = (arch_name or "").lower()
+def disasm_flavor(arch) -> str:
+    if arch is None:
+        return ""
+    if hasattr(arch, "disasm_flavor"):
+        try:
+            return arch.disasm_flavor()
+        except Exception:
+            return ""
+    name = (arch or "").lower()
     if name.startswith("x86") or name in {"x64", "amd64", "i386"}:
         return "intel"
     return ""
@@ -56,7 +63,7 @@ def read_instructions_around(
     pc: int | None,
     before: int,
     after: int,
-    arch: ArchSpec,
+    arch: ArchView,
     flavor: str = "intel",
 ) -> list[Instruction]:
     total = before + after + 1

@@ -3,7 +3,8 @@ from __future__ import annotations
 import shlex
 
 from lldb_mix.commands.context import render_context_if_enabled
-from lldb_mix.commands.utils import emit_result, parse_int
+from lldb_mix.commands.utils import emit_result
+from lldb_mix.core.addressing import parse_int
 from lldb_mix.core.state import WATCHLIST
 
 

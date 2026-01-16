@@ -3,7 +3,8 @@ from __future__ import annotations
 import argparse
 import shlex
 
-from lldb_mix.commands.utils import emit_result, module_fullpath, parse_int
+from lldb_mix.commands.utils import emit_result, module_fullpath
+from lldb_mix.core.addressing import parse_int
 from lldb_mix.core.memory import (
     ProcessMemoryReader,
     read_memory_regions,
