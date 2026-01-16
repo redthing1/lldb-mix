@@ -307,11 +307,14 @@ def _render_branch_split(
     if ctx.term_width < BRANCH_MIN_COL_WIDTH * 2 + BRANCH_COLUMN_GAP:
         return None
 
+    read_pointer = getattr(ctx.reader, "read_pointer", None)
     target = resolve_flow_target(
         current.mnemonic,
         current.operands,
         snapshot.regs,
         arch,
+        read_pointer=read_pointer,
+        ptr_size=state.ptr_size,
     )
     fallthrough = _fallthrough_addr(insts, current_idx, arch)
     if target is None or fallthrough is None:
@@ -469,11 +472,14 @@ def _inst_comment(ctx: PaneContext, inst, ptr_size: int, flags: int) -> str | No
         )
     )
     if is_branch_like(inst.mnemonic, ctx.snapshot.arch):
+        read_pointer = getattr(ctx.reader, "read_pointer", None)
         target = resolve_flow_target(
             inst.mnemonic,
             inst.operands,
             ctx.snapshot.regs,
             ctx.snapshot.arch,
+            read_pointer=read_pointer,
+            ptr_size=ptr_size,
         )
         if target is not None:
             target_text = format_addr(target, ptr_size)

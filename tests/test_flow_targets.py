@@ -39,6 +39,34 @@ class TestFlowTargets(unittest.TestCase):
             resolve_flow_target("b.eq", "0x2000", {}, ARM64_ARCH), 0x2000
         )
 
+    def test_arm64_ret_target(self):
+        regs = {"lr": 0x1234}
+        self.assertEqual(resolve_flow_target("ret", "", regs, ARM64_ARCH), 0x1234)
+
+    def test_riscv_ret_target(self):
+        regs = {"ra": 0x2000}
+        self.assertEqual(resolve_flow_target("ret", "", regs, RISCV64_ABI_ARCH), 0x2000)
+
+    def test_x64_ret_target(self):
+        regs = {"rsp": 0x1000}
+
+        def read_pointer(addr: int, size: int) -> int | None:
+            if addr == 0x1000 and size == 8:
+                return 0xdeadbeef
+            return None
+
+        self.assertEqual(
+            resolve_flow_target(
+                "ret",
+                "",
+                regs,
+                X64_ARCH,
+                read_pointer=read_pointer,
+                ptr_size=8,
+            ),
+            0xdeadbeef,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from lldb_mix.arch.base import ArchSpec, BranchDecision
+from lldb_mix.arch.base import ArchSpec, BranchDecision, ReadPointer
 
 
 def is_branch_like(mnemonic: str, arch: ArchSpec) -> bool:
@@ -14,10 +14,18 @@ def resolve_flow_target(
     operands: str,
     regs: dict[str, int],
     arch: ArchSpec,
+    read_pointer: ReadPointer | None = None,
+    ptr_size: int | None = None,
 ) -> int | None:
     if not arch:
         return None
-    return arch.resolve_flow_target(mnemonic, operands, regs)
+    return arch.resolve_flow_target(
+        mnemonic,
+        operands,
+        regs,
+        read_pointer=read_pointer,
+        ptr_size=ptr_size,
+    )
 
 
 def branch_decision(

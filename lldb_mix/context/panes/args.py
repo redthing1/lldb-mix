@@ -71,8 +71,14 @@ class ArgsPane(Pane):
         self, ctx: PaneContext, inst, regs: dict[str, int], ptr_size: int
     ) -> str:
         label = self.style(ctx, "call args", "label")
+        read_pointer = getattr(ctx.reader, "read_pointer", None)
         target = resolve_flow_target(
-            inst.mnemonic, inst.operands, regs, ctx.snapshot.arch
+            inst.mnemonic,
+            inst.operands,
+            regs,
+            ctx.snapshot.arch,
+            read_pointer=read_pointer,
+            ptr_size=ptr_size,
         )
         if target is None:
             return label

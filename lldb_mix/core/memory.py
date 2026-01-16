@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
-RegionKey = tuple[int, int, bool, bool, bool, str | None]
+RegionKey = tuple[int, int, bool, bool, bool, Optional[str]]
 
 
 @dataclass(frozen=True)

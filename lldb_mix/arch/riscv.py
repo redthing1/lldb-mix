@@ -6,6 +6,7 @@ from lldb_mix.arch.abi import RISCV_ABI, RISCV_X_ABI
 from lldb_mix.arch.base import (
     ArchSpec,
     BranchDecision,
+    ReadPointer,
     parse_immediate,
     parse_leading_int,
     resolve_reg_operand,
@@ -170,8 +171,15 @@ class RiscvArch(ArchSpec):
         return super().is_branch_like(mnemonic)
 
     def resolve_flow_target(
-        self, mnemonic: str, operands: str, regs: dict[str, int]
+        self,
+        mnemonic: str,
+        operands: str,
+        regs: dict[str, int],
+        read_pointer: ReadPointer | None = None,
+        ptr_size: int | None = None,
     ) -> int | None:
+        _ = read_pointer
+        _ = ptr_size
         if not self.is_branch_like(mnemonic):
             return None
 
@@ -294,6 +302,8 @@ class RiscvArch(ArchSpec):
 
         if include_calls and self.is_call(mnemonic):
             return BranchDecision(True, "", "call")
+        if include_unconditional and self.is_return(mnemonic):
+            return BranchDecision(True, "", "return")
         if include_unconditional and self.is_unconditional_branch(mnemonic):
             return BranchDecision(True, "", "unconditional")
         return None

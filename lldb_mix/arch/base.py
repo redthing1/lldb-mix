@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+from typing import Callable, Optional
 
 from lldb_mix.arch.abi import AbiSpec
+
+ReadPointer = Callable[[int, int], Optional[int]]
 
 
 @dataclass(frozen=True)
@@ -11,6 +14,7 @@ class BranchDecision:
     taken: bool
     reason: str
     kind: str
+
 
 @dataclass(frozen=True)
 class ArchSpec:
@@ -50,19 +54,27 @@ class ArchSpec:
             return mnem in self.call_mnemonics
         return mnem.startswith("call")
 
+    def is_return(self, mnemonic: str) -> bool:
+        return (mnemonic or "").lower().startswith("ret")
+
     def is_branch_like(self, mnemonic: str) -> bool:
-        mnem = (mnemonic or "").lower()
-        if mnem.startswith("ret"):
-            return True
         return (
-            self.is_conditional_branch(mnemonic)
+            self.is_return(mnemonic)
+            or self.is_conditional_branch(mnemonic)
             or self.is_unconditional_branch(mnemonic)
             or self.is_call(mnemonic)
         )
 
     def resolve_flow_target(
-        self, mnemonic: str, operands: str, regs: dict[str, int]
+        self,
+        mnemonic: str,
+        operands: str,
+        regs: dict[str, int],
+        read_pointer: ReadPointer | None = None,
+        ptr_size: int | None = None,
     ) -> int | None:
+        _ = read_pointer
+        _ = ptr_size
         if not self.is_branch_like(mnemonic):
             return None
         if not operands:
@@ -85,6 +97,8 @@ class ArchSpec:
                 return BranchDecision(taken, reason, "conditional")
         if include_calls and self.is_call(mnemonic):
             return BranchDecision(True, "", "call")
+        if include_unconditional and self.is_return(mnemonic):
+            return BranchDecision(True, "", "return")
         if include_unconditional and self.is_unconditional_branch(mnemonic):
             return BranchDecision(True, "", "unconditional")
         return None

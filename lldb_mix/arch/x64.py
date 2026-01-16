@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from lldb_mix.arch.base import ArchSpec, BranchDecision, parse_target_operand
+from lldb_mix.arch.base import (
+    ArchSpec,
+    BranchDecision,
+    ReadPointer,
+    parse_target_operand,
+)
 
 _FLAG_BITS = {
     "cf": 0,
@@ -94,10 +99,23 @@ class X64Arch(ArchSpec):
         return super().is_branch_like(mnemonic)
 
     def resolve_flow_target(
-        self, mnemonic: str, operands: str, regs: dict[str, int]
+        self,
+        mnemonic: str,
+        operands: str,
+        regs: dict[str, int],
+        read_pointer: ReadPointer | None = None,
+        ptr_size: int | None = None,
     ) -> int | None:
         if not self.is_branch_like(mnemonic):
             return None
+        mnem = mnemonic.lower()
+        if mnem.startswith("ret"):
+            if not read_pointer or not ptr_size:
+                return None
+            sp = regs.get(self.sp_reg)
+            if sp is None:
+                return None
+            return read_pointer(sp, ptr_size)
         if not operands:
             return None
         op = operands.split(",", 1)[0].strip()
@@ -158,6 +176,8 @@ class X64Arch(ArchSpec):
 
         if include_calls and self.is_call(mnemonic):
             return BranchDecision(True, "", "call")
+        if include_unconditional and self.is_return(mnemonic):
+            return BranchDecision(True, "", "return")
         if include_unconditional and self.is_unconditional_branch(mnemonic):
             return BranchDecision(True, "", "unconditional")
         return None

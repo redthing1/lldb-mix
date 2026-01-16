@@ -40,8 +40,14 @@ class FlowPane(Pane):
             lines.append(f"{mnemonic} {inst.operands}")
         else:
             lines.append(mnemonic)
+        read_pointer = getattr(ctx.reader, "read_pointer", None)
         target = resolve_flow_target(
-            inst.mnemonic, inst.operands, snapshot.regs, snapshot.arch
+            inst.mnemonic,
+            inst.operands,
+            snapshot.regs,
+            snapshot.arch,
+            read_pointer=read_pointer,
+            ptr_size=ptr_size,
         )
         if target is None:
             lines.append("(no flow target resolved)")
