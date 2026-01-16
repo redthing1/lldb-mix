@@ -22,11 +22,7 @@ class ArgsPane(Pane):
     def title(self, ctx: PaneContext | None = None) -> str:
         if ctx is None:
             return super().title(ctx)
-        abi = getattr(ctx.snapshot.arch, "abi", None)
-        label = self.name
-        if abi and getattr(abi, "name", ""):
-            label = f"{self.name}:{abi.name}"
-        return self.style(ctx, f"[{label}]", "title")
+        return self.style(ctx, f"[{self.name}]", "title")
 
     def visible(self, ctx: PaneContext) -> bool:
         abi = getattr(ctx.snapshot.arch, "abi", None)
@@ -52,11 +48,12 @@ class ArgsPane(Pane):
 
         ptr_size = arch.ptr_size or 8
         call_inst = _current_call_inst(ctx, arch, snapshot.pc)
+        abi_label = self._abi_label(ctx, abi)
+        if abi_label:
+            lines.append(abi_label)
         if call_inst:
             header = self._call_header(ctx, call_inst, regs, ptr_size)
-        else:
-            header = self.style(ctx, "arg regs", "label")
-        lines.append(header)
+            lines.append(header)
 
         name_width = max(len(reg) for reg in arg_regs)
 
@@ -111,6 +108,12 @@ class ArgsPane(Pane):
                 sym_text = self.style(ctx, format_symbol(symbol), "symbol")
                 line = f"{line} {sym_text}"
         return line
+
+    def _abi_label(self, ctx: PaneContext, abi) -> str | None:
+        name = getattr(abi, "name", "") if abi else ""
+        if not name:
+            return None
+        return self.style(ctx, f"abi: {name}", "muted")
 
 
 def _current_call_inst(ctx: PaneContext, arch, pc: int):
