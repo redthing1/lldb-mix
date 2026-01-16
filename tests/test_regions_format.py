@@ -32,10 +32,17 @@ class TestRegionsFormat(unittest.TestCase):
             ),
         ):
             lines = format_regions_table(
-                regions, ptr_size=8, target=object(), lldb_module=None
+                regions,
+                ptr_size=8,
+                target=object(),
+                lldb_module=None,
+                term_width=120,
+                style=lambda text, role: text,
             )
 
-        self.assertEqual(lines[0].split()[:5], ["START", "END", "SIZE", "PROT", "NAME"])
+        self.assertEqual(
+            lines[0].split()[:6], ["START", "END", "SIZE", "PROT", "NAME", "PATH"]
+        )
         self.assertEqual(lines[1], "-" * len(lines[0]))
         self.assertIn("r-x", lines[2])
         self.assertIn("rw-", lines[3])
