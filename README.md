@@ -5,14 +5,14 @@ Clean, modular LLDB context UI focused on binary-first debugging.
 ## install
 
 ```sh
-./scripts/install.py
+python ./scripts/install.py
 ```
 
 ## quick start
 
 ```
 lldb /path/to/bin
-(lldb) context
+mix> context
 ```
 
 ## Usage

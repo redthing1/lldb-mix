@@ -4,6 +4,7 @@ from lldb_mix.core.config import load_settings
 from lldb_mix.core.state import SETTINGS
 from lldb_mix.core.stop_hooks import ensure_stop_hook
 from lldb_mix.core.version import parse_lldb_version
+from lldb_mix.ui.ansi import Color, Style, styled
 from lldb_mix.ui.console import banner, err
 
 
@@ -16,8 +17,33 @@ def _register_command(debugger, command: str) -> None:
 
     res = lldb.SBCommandReturnObject()
     debugger.GetCommandInterpreter().HandleCommand(command, res)
-    if not res.Succeeded():
-        err(f"failed to register command: {command}")
+    if res.Succeeded():
+        return
+    error = res.GetError() or ""
+    if _is_duplicate_command_error(error):
+        return
+    if error:
+        err(f"failed to register command: {command} ({error.strip()})")
+        return
+    err(f"failed to register command: {command}")
+
+
+def _is_duplicate_command_error(error: str) -> bool:
+    text = error.lower()
+    return "already exists" in text or "already a command" in text
+
+
+def _set_prompt(debugger) -> None:
+    try:
+        prompt = styled(
+            "mix",
+            Style.BOLD,
+            Color.BRIGHT_CYAN,
+            reset_prefix=True,
+        ) + "> "
+        debugger.SetPrompt(prompt)
+    except Exception as exc:
+        err(f"failed to set prompt: {exc}")
 
 
 def init(debugger, internal_dict) -> None:
@@ -141,6 +167,7 @@ def init(debugger, internal_dict) -> None:
     )
 
     load_settings(SETTINGS)
+    _set_prompt(debugger)
     if SETTINGS.auto_context:
         target = debugger.GetSelectedTarget()
         if target and target.IsValid():

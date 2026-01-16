@@ -65,3 +65,12 @@ _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 def strip_ansi(text: str) -> str:
     return _ANSI_RE.sub("", text)
+
+
+def styled(text: str, *tokens: AnsiToken, reset_prefix: bool = False) -> str:
+    prefix = escape(tokens)
+    if not prefix:
+        return text
+    if reset_prefix:
+        return f"{RESET}{prefix}{text}{RESET}"
+    return f"{prefix}{text}{RESET}"
