@@ -61,8 +61,9 @@ def _current_inst(ctx: PaneContext):
     pc = ctx.snapshot.pc
     if pc == 0 or not ctx.target:
         return None
+    flavor = "intel" if ctx.snapshot.arch.name.startswith("x86") else ""
     try:
-        insts = read_instructions(ctx.target, pc, 1)
+        insts = read_instructions(ctx.target, pc, 1, flavor)
     except Exception:
         return None
     if not insts:

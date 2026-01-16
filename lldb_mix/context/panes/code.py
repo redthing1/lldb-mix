@@ -4,7 +4,7 @@ import re
 
 from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.types import PaneContext
-from lldb_mix.core.disasm import read_instructions_around
+from lldb_mix.core.disasm import read_instructions, read_instructions_around
 from lldb_mix.core.flow import is_branch_like, resolve_flow_target
 from lldb_mix.deref import (
     classify_token,
@@ -13,6 +13,12 @@ from lldb_mix.deref import (
     format_symbol,
     summarize_chain,
 )
+from lldb_mix.ui.ansi import RESET, strip_ansi
+
+
+BRANCH_VIEW_MIN_WIDTH = 120
+BRANCH_MIN_COL_WIDTH = 50
+BRANCH_COLUMN_GAP = 4
 
 
 class CodePane(Pane):
@@ -51,68 +57,50 @@ class CodePane(Pane):
             return lines
 
         bytes_pad = 0
-        bytes_texts: list[str] = []
+        bytes_texts: list[str] = [""] * len(insts)
         if ctx.settings.show_opcodes:
-            for inst in insts:
-                bytes_texts.append(" ".join(f"{b:02x}" for b in inst.bytes))
+            bytes_texts = [" ".join(f"{b:02x}" for b in inst.bytes) for inst in insts]
             bytes_pad = max((len(text) for text in bytes_texts), default=0)
 
+        current_idx = next(
+            (idx for idx, inst in enumerate(insts) if inst.address == pc),
+            None,
+        )
+        if current_idx is None:
+            lines.append("(disassembly unavailable)")
+            return lines
+
+        branch_lines = _render_branch_split(
+            self,
+            ctx,
+            insts,
+            current_idx,
+            flags,
+            ptr_size,
+            bytes_texts,
+            bytes_pad,
+            flavor,
+        )
+        if branch_lines:
+            lines.extend(branch_lines)
+            return lines
+
         for idx, inst in enumerate(insts):
-            prefix = "=>" if inst.address == pc else "  "
-            addr_text = format_addr(inst.address, ptr_size)
-            bytes_text = ""
-            if ctx.settings.show_opcodes:
-                bytes_text = bytes_texts[idx]
-                bytes_text = f"{bytes_text:<{bytes_pad}}" if bytes_text else ""
-
-            prefix_role = "pc_marker" if inst.address == pc else "muted"
-            prefix_colored = self.style(ctx, prefix, prefix_role)
-            addr_colored = self.style(ctx, addr_text, "addr")
-            bytes_colored = self.style(ctx, bytes_text, "opcode") if bytes_text else ""
-            mnemonic_colored = self.style(ctx, inst.mnemonic, "mnemonic")
-
-            text = f"{prefix_colored} {addr_colored} "
-            if bytes_colored:
-                text += bytes_colored
-                text += " "
-            text += mnemonic_colored
-            if inst.operands:
-                text += f" {inst.operands}"
-
-            comment_parts: list[str] = []
-            if inst.address == pc:
-                hint = _branch_taken_hint(
-                    inst.mnemonic, inst.operands, snapshot.regs, arch, flags
+            bytes_text = bytes_texts[idx] if bytes_texts else ""
+            lines.append(
+                _format_inst_line(
+                    self,
+                    ctx,
+                    inst,
+                    ptr_size,
+                    bytes_text,
+                    bytes_pad,
+                    inst.address == pc,
+                    flags,
+                    include_comment=inst.address == pc,
+                    tone="normal",
                 )
-                if hint:
-                    comment_parts.append(hint)
-                comment_parts.extend(
-                    _operand_annotations(
-                        inst.operands,
-                        snapshot.regs,
-                        ptr_size,
-                        ctx.reader,
-                        snapshot.maps,
-                        ctx.resolver,
-                        ctx.settings,
-                    )
-                )
-                if is_branch_like(inst.mnemonic):
-                    target = resolve_flow_target(
-                        inst.mnemonic, inst.operands, snapshot.regs
-                    )
-                    if target is not None:
-                        target_text = format_addr(target, ptr_size)
-                        if ctx.resolver:
-                            symbol = ctx.resolver.resolve(target)
-                            if symbol:
-                                target_text = f"{target_text} {format_symbol(symbol)}"
-                        comment_parts.append(f"target={target_text}")
-
-            if comment_parts:
-                comment = "; " + " | ".join(comment_parts)
-                text += f" {self.style(ctx, comment, 'comment')}"
-            lines.append(text)
+            )
 
         return lines
 
@@ -245,11 +233,27 @@ def _branch_taken_hint(
     arch,
     flags: int,
 ) -> str | None:
+    decision = _branch_decision(mnemonic, operands, regs, arch, flags)
+    if not decision:
+        return None
+    taken, reason = decision
+    if reason:
+        return f"{'taken' if taken else 'not taken'} ({reason})"
+    return "taken" if taken else "not taken"
+
+
+def _branch_decision(
+    mnemonic: str,
+    operands: str,
+    regs: dict[str, int],
+    arch,
+    flags: int,
+) -> tuple[bool, str] | None:
     if arch.is_conditional_branch(mnemonic):
         taken, reason = arch.branch_taken(mnemonic, flags)
-        if reason:
-            return f"{'taken' if taken else 'not taken'} ({reason})"
-        return "taken" if taken else "not taken"
+        if not reason:
+            return None
+        return taken, reason
 
     mnem = mnemonic.lower()
     if mnem in {"cbz", "cbnz"}:
@@ -258,7 +262,8 @@ def _branch_taken_hint(
         if value is None:
             return None
         taken = (value == 0) if mnem == "cbz" else (value != 0)
-        return f"{'taken' if taken else 'not taken'} ({reg}={'0' if value == 0 else '!=0'})"
+        reason = f"{reg}={'0' if value == 0 else '!=0'}"
+        return taken, reason
 
     if mnem in {"tbz", "tbnz"}:
         parts = [p.strip() for p in operands.split(",")]
@@ -275,7 +280,8 @@ def _branch_taken_hint(
             return None
         bit_set = (value >> bit) & 1
         taken = (bit_set == 0) if mnem == "tbz" else (bit_set == 1)
-        return f"{'taken' if taken else 'not taken'} ({reg}[{bit}]={bit_set})"
+        reason = f"{reg}[{bit}]={bit_set}"
+        return taken, reason
 
     return None
 
@@ -321,3 +327,331 @@ def _alias_registers(regs: dict[str, int]) -> dict[str, str]:
             if reg in lower:
                 aliases[f"r{idx}d"] = reg
     return aliases
+
+
+def _render_branch_split(
+    pane: CodePane,
+    ctx: PaneContext,
+    insts,
+    current_idx: int,
+    flags: int,
+    ptr_size: int,
+    bytes_texts: list[str],
+    bytes_pad: int,
+    flavor: str,
+) -> list[str] | None:
+    snapshot = ctx.snapshot
+    arch = snapshot.arch
+    current = insts[current_idx]
+    decision = _branch_decision(
+        current.mnemonic, current.operands, snapshot.regs, arch, flags
+    )
+    if not decision:
+        return None
+
+    if ctx.term_width < BRANCH_VIEW_MIN_WIDTH:
+        return None
+    if ctx.term_width < BRANCH_MIN_COL_WIDTH * 2 + BRANCH_COLUMN_GAP:
+        return None
+
+    target = resolve_flow_target(
+        current.mnemonic,
+        current.operands,
+        snapshot.regs,
+    )
+    fallthrough = _fallthrough_addr(insts, current_idx, arch)
+    if target is None or fallthrough is None:
+        return None
+
+    block_lines = max(ctx.settings.code_lines_after, 0)
+    if block_lines <= 0:
+        return None
+    left_insts = read_instructions(ctx.target, fallthrough, block_lines, flavor)
+    right_insts = read_instructions(ctx.target, target, block_lines, flavor)
+    if not left_insts or not right_insts:
+        return None
+
+    lines: list[str] = []
+    for idx in range(current_idx + 1):
+        inst = insts[idx]
+        bytes_text = bytes_texts[idx] if bytes_texts else ""
+        lines.append(
+            _format_inst_line(
+                pane,
+                ctx,
+                inst,
+                ptr_size,
+                bytes_text,
+                bytes_pad,
+                inst.address == snapshot.pc,
+                flags,
+                include_comment=inst.address == snapshot.pc,
+                tone="normal",
+            )
+        )
+
+    taken, _ = decision
+    left_tone = "normal" if not taken else "muted"
+    right_tone = "normal" if taken else "muted"
+
+    show_opcodes = ctx.settings.show_opcodes
+    left_bytes = _bytes_texts(left_insts) if show_opcodes else ["" for _ in left_insts]
+    right_bytes = _bytes_texts(right_insts) if show_opcodes else ["" for _ in right_insts]
+    block_pad = max(
+        max((len(text) for text in left_bytes), default=0),
+        max((len(text) for text in right_bytes), default=0),
+    )
+
+    left_lines = [
+        _format_inst_line(
+            pane,
+            ctx,
+            inst,
+            ptr_size,
+            left_bytes[idx] if left_bytes else "",
+            block_pad,
+            False,
+            flags,
+            include_comment=False,
+            tone=left_tone,
+        )
+        for idx, inst in enumerate(left_insts)
+    ]
+    right_lines = [
+        _format_inst_line(
+            pane,
+            ctx,
+            inst,
+            ptr_size,
+            right_bytes[idx] if right_bytes else "",
+            block_pad,
+            False,
+            flags,
+            include_comment=False,
+            tone=right_tone,
+        )
+        for idx, inst in enumerate(right_insts)
+    ]
+
+    widths = _branch_widths(ctx.term_width, left_lines, right_lines)
+    if not widths:
+        return None
+    left_width, right_width = widths
+    lines.extend(
+        _join_branch_blocks(
+            pane,
+            ctx,
+            left_lines,
+            right_lines,
+            left_width,
+            right_width,
+            taken,
+        )
+    )
+    return lines
+
+
+def _format_inst_line(
+    pane: CodePane,
+    ctx: PaneContext,
+    inst,
+    ptr_size: int,
+    bytes_text: str,
+    bytes_pad: int,
+    is_pc: bool,
+    flags: int,
+    include_comment: bool,
+    tone: str,
+) -> str:
+    prefix = "=>" if is_pc else "  "
+    addr_text = format_addr(inst.address, ptr_size)
+    bytes_text = f"{bytes_text:<{bytes_pad}}" if bytes_text else ""
+
+    if tone == "muted":
+        text = f"{prefix} {addr_text}"
+        if bytes_text:
+            text += f" {bytes_text}"
+        text += f" {inst.mnemonic}"
+        if inst.operands:
+            text += f" {inst.operands}"
+        return pane.style(ctx, text, "muted")
+
+    prefix_role = "pc_marker" if is_pc else "muted"
+    prefix_colored = pane.style(ctx, prefix, prefix_role)
+    addr_colored = pane.style(ctx, addr_text, "addr")
+    bytes_colored = pane.style(ctx, bytes_text, "opcode") if bytes_text else ""
+    mnemonic_colored = pane.style(ctx, inst.mnemonic, "mnemonic")
+
+    text = f"{prefix_colored} {addr_colored} "
+    if bytes_colored:
+        text += bytes_colored
+        text += " "
+    text += mnemonic_colored
+    if inst.operands:
+        text += f" {inst.operands}"
+
+    if include_comment:
+        comment_parts: list[str] = []
+        hint = _branch_taken_hint(
+            inst.mnemonic,
+            inst.operands,
+            ctx.snapshot.regs,
+            ctx.snapshot.arch,
+            flags,
+        )
+        if hint:
+            comment_parts.append(hint)
+        comment_parts.extend(
+            _operand_annotations(
+                inst.operands,
+                ctx.snapshot.regs,
+                ptr_size,
+                ctx.reader,
+                ctx.snapshot.maps,
+                ctx.resolver,
+                ctx.settings,
+            )
+        )
+        if is_branch_like(inst.mnemonic):
+            target = resolve_flow_target(
+                inst.mnemonic,
+                inst.operands,
+                ctx.snapshot.regs,
+            )
+            if target is not None:
+                target_text = format_addr(target, ptr_size)
+                if ctx.resolver:
+                    symbol = ctx.resolver.resolve(target)
+                    if symbol:
+                        target_text = f"{target_text} {format_symbol(symbol)}"
+                comment_parts.append(f"target={target_text}")
+
+        if comment_parts:
+            comment = "; " + " | ".join(comment_parts)
+            text += f" {pane.style(ctx, comment, 'comment')}"
+
+    return text
+
+
+def _fallthrough_addr(insts, current_idx: int, arch) -> int | None:
+    if current_idx + 1 < len(insts):
+        return insts[current_idx + 1].address
+    current = insts[current_idx]
+    if current.bytes:
+        return current.address + len(current.bytes)
+    if arch.max_inst_bytes:
+        return current.address + arch.max_inst_bytes
+    return None
+
+
+def _bytes_texts(insts) -> list[str]:
+    return [" ".join(f"{b:02x}" for b in inst.bytes) for inst in insts]
+
+
+def _join_branch_blocks(
+    pane: CodePane,
+    ctx: PaneContext,
+    left_lines: list[str],
+    right_lines: list[str],
+    left_width: int,
+    right_width: int,
+    taken: bool,
+) -> list[str]:
+    height = max(len(left_lines), len(right_lines))
+    left = list(left_lines)
+    right = list(right_lines)
+    if len(left) < height:
+        left.extend([" " * left_width] * (height - len(left)))
+    if len(right) < height:
+        right.extend([" " * right_width] * (height - len(right)))
+
+    lines: list[str] = []
+    for idx in range(height):
+        left_text = _pad_line(_truncate_ansi(left[idx], left_width), left_width)
+        right_text = _pad_line(_truncate_ansi(right[idx], right_width), right_width)
+        gap = _branch_gap(pane, ctx, idx, taken)
+        lines.append(f"{left_text}{gap}{right_text}".rstrip())
+    return lines
+
+
+def _branch_gap(pane: CodePane, ctx: PaneContext, row_idx: int, taken: bool) -> str:
+    if row_idx != 0 or BRANCH_COLUMN_GAP < 2:
+        return " " * BRANCH_COLUMN_GAP
+    arrow = pane.style(ctx, "->", "arrow" if taken else "muted")
+    padding = " " * max(BRANCH_COLUMN_GAP - 2, 0)
+    return f"{padding}{arrow}"
+
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _truncate_ansi(text: str, width: int) -> str:
+    if width <= 0:
+        return ""
+    plain = strip_ansi(text)
+    if len(plain) <= width:
+        return text
+    if width <= 3:
+        return plain[:width]
+
+    target = width - 3
+    out: list[str] = []
+    visible = 0
+    idx = 0
+    had_ansi = False
+    while idx < len(text) and visible < target:
+        if text[idx] == "\x1b":
+            match = _ANSI_RE.match(text, idx)
+            if match:
+                out.append(match.group(0))
+                had_ansi = True
+                idx = match.end()
+                continue
+        out.append(text[idx])
+        visible += 1
+        idx += 1
+    out.append("...")
+    if had_ansi:
+        out.append(RESET)
+    return "".join(out)
+
+
+def _pad_line(text: str, width: int) -> str:
+    length = len(strip_ansi(text))
+    if length >= width:
+        return text
+    return text + (" " * (width - length))
+
+
+def _max_visible_width(lines: list[str]) -> int:
+    if not lines:
+        return 0
+    return max(len(strip_ansi(line)) for line in lines)
+
+
+def _branch_widths(
+    term_width: int,
+    left_lines: list[str],
+    right_lines: list[str],
+) -> tuple[int, int] | None:
+    if term_width < BRANCH_VIEW_MIN_WIDTH:
+        return None
+    available = term_width - BRANCH_COLUMN_GAP
+    if available < BRANCH_MIN_COL_WIDTH * 2:
+        return None
+
+    left_target = max(_max_visible_width(left_lines), BRANCH_MIN_COL_WIDTH)
+    right_target = max(_max_visible_width(right_lines), BRANCH_MIN_COL_WIDTH)
+    if left_target + right_target <= available:
+        return left_target, right_target
+
+    total = max(left_target + right_target, 1)
+    left_width = int(available * (left_target / total))
+    left_width = max(
+        BRANCH_MIN_COL_WIDTH,
+        min(left_width, available - BRANCH_MIN_COL_WIDTH),
+    )
+    right_width = available - left_width
+    if right_width < BRANCH_MIN_COL_WIDTH:
+        return None
+    return left_width, right_width
