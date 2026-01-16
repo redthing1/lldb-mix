@@ -50,9 +50,9 @@ class RegsPane(Pane):
             name_colored = self.style(ctx, name_text, "reg_name")
             value_role = "reg_changed" if changed else "reg_value"
             value_colored = self.style(ctx, value_text, value_role)
-            sep = self.style(ctx, ": ", "label")
+            sep = self.style(ctx, " ", "label")
             cell_text = f"{name_colored}{sep}{value_colored}"
-            cell_plain = f"{name_text}: {value_text}"
+            cell_plain = f"{name_text} {value_text}"
             entries.append((cell_text, len(cell_plain)))
 
             if not is_flags and ctx.settings.aggressive_deref and ctx.reader:
@@ -102,16 +102,22 @@ class RegsPane(Pane):
 
         if pointers:
             lines.append(self.style(ctx, "pointers:", "label"))
+            pointer_name_width = max(len(reg_name) for reg_name, *_ in pointers)
+            indent = "  "
             for reg_name, summary, kind, tag in pointers:
                 role = "string" if kind == "string" else "symbol"
                 if kind == "region":
                     role = "muted"
                 if kind == "addr":
                     role = "addr"
-                reg_text = self.style(ctx, f"{reg_name:<{name_width}}", "reg_name")
+                reg_text = self.style(
+                    ctx,
+                    f"{reg_name:<{pointer_name_width}}",
+                    "reg_name",
+                )
                 arrow = self.style(ctx, "->", "arrow")
                 summary_text = self.style(ctx, summary, role)
-                line = f"  {reg_text} {arrow} {summary_text}"
+                line = f"{indent}{reg_text} {arrow} {summary_text}"
                 if tag:
                     tag_text = self.style(ctx, tag, "muted")
                     line = f"{line} {tag_text}"
