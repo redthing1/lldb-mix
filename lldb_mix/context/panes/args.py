@@ -94,7 +94,9 @@ class ArgsPane(Pane):
 
         return lines
 
-    def _call_header(self, ctx: PaneContext, inst, regs: dict[str, int], ptr_size: int) -> str:
+    def _call_header(
+        self, ctx: PaneContext, inst, regs: dict[str, int], ptr_size: int
+    ) -> str:
         label = self.style(ctx, "call args", "label")
         target = resolve_flow_target(inst.mnemonic, inst.operands, regs)
         if target is None:

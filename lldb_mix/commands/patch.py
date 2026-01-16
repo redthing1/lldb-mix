@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import shlex
 
-from lldb_mix.commands.utils import emit_result, eval_expression, parse_int, resolve_addr
+from lldb_mix.commands.utils import (
+    emit_result,
+    eval_expression,
+    parse_int,
+    resolve_addr,
+)
 from lldb_mix.core.patches import format_bytes, parse_hex_bytes
 from lldb_mix.core.session import Session
 from lldb_mix.core.snapshot import capture_snapshot
@@ -86,7 +91,9 @@ def cmd_patch(debugger, command, result, internal_dict) -> None:
         emit_result(result, "[lldb-mix] patch write failed", lldb)
         return
 
-    summary = f"[lldb-mix] patch {subcmd} {format_addr(addr, ptr_size)} len={len(payload)}"
+    summary = (
+        f"[lldb-mix] patch {subcmd} {format_addr(addr, ptr_size)} len={len(payload)}"
+    )
     if count > 1 and subcmd in ("nop", "int3", "null"):
         summary += f" count={count}"
     emit_result(result, summary, lldb)
@@ -101,7 +108,9 @@ def _parse_addr(tokens: list[str], regs: dict[str, int], frame):
     return addr, None
 
 
-def _parse_patch_args(subcmd: str, tokens: list[str], regs: dict[str, int], frame, arch):
+def _parse_patch_args(
+    subcmd: str, tokens: list[str], regs: dict[str, int], frame, arch
+):
     if subcmd == "write":
         if len(tokens) < 2:
             return 0, 0, b"", "missing write arguments"

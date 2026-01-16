@@ -71,9 +71,7 @@ def cmd_findmem(debugger, command, result, internal_dict) -> None:
                 hit_addr = base + idx
                 if region.start <= hit_addr < region.end:
                     hits += 1
-                    lines.append(
-                        _format_hit(target, region, hit_addr, ptr_size, lldb)
-                    )
+                    lines.append(_format_hit(target, region, hit_addr, ptr_size, lldb))
                     if parsed.count > 0 and hits >= parsed.count:
                         emit_result(result, "\n".join(lines), lldb)
                         return
@@ -133,7 +131,10 @@ def _parse_args(args: list[str]) -> tuple[_FindArgs | None, str | None]:
             return None, "invalid count"
         count = parsed
 
-    return _FindArgs(pattern=pattern, kind=kind, count=count, verbose=opts.verbose), None
+    return (
+        _FindArgs(pattern=pattern, kind=kind, count=count, verbose=opts.verbose),
+        None,
+    )
 
 
 def _pattern_from_opts(opts) -> tuple[bytes | None, str, str | None]:

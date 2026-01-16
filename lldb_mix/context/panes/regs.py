@@ -40,9 +40,7 @@ class RegsPane(Pane):
         for reg_name in reg_names:
             value = regs[reg_name]
             is_flags = bool(flags_reg and reg_name == flags_reg)
-            changed = (
-                reg_name in ctx.last_regs and ctx.last_regs.get(reg_name) != value
-            )
+            changed = reg_name in ctx.last_regs and ctx.last_regs.get(reg_name) != value
             if is_flags:
                 flags_text = arch.format_flags(value)
                 value_text = flags_text if flags_text else format_addr(value, ptr_size)

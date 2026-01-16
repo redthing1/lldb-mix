@@ -67,9 +67,7 @@ def _remove_block(path: Path) -> bool:
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Register lldb-mix in ~/.lldbinit."
-    )
+    parser = argparse.ArgumentParser(description="Register lldb-mix in ~/.lldbinit.")
     parser.add_argument(
         "--print",
         action="store_true",

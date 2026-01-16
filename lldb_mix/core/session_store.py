@@ -57,7 +57,9 @@ def load_session(path: str) -> dict[str, object] | None:
     return data
 
 
-def apply_session(target, watchlist: WatchList, data: dict[str, object]) -> tuple[int, int]:
+def apply_session(
+    target, watchlist: WatchList, data: dict[str, object]
+) -> tuple[int, int]:
     if not data:
         return 0, 0
     raw_bps = data.get("breakpoints")
@@ -79,6 +81,4 @@ def list_sessions() -> list[str]:
     root = sessions_dir()
     if not os.path.isdir(root):
         return []
-    return sorted(
-        name for name in os.listdir(root) if name.endswith(".json")
-    )
+    return sorted(name for name in os.listdir(root) if name.endswith(".json"))

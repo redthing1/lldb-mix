@@ -39,8 +39,8 @@ def _set_prompt(debugger) -> None:
         debugger.SetPrompt("mix> ")
         debugger.HandleCommand("settings set use-color true")
         prefix = escape((Style.BOLD, Color.BRIGHT_CYAN))
-        debugger.HandleCommand(f"settings set prompt-ansi-prefix \"{prefix}\"")
-        debugger.HandleCommand(f"settings set prompt-ansi-suffix \"{RESET}\"")
+        debugger.HandleCommand(f'settings set prompt-ansi-prefix "{prefix}"')
+        debugger.HandleCommand(f'settings set prompt-ansi-suffix "{RESET}"')
     except Exception as exc:
         err(f"failed to set prompt: {exc}")
 

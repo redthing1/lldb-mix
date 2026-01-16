@@ -152,10 +152,7 @@ def _default_args() -> DumpArgs:
 
 
 def _usage() -> str:
-    return (
-        "[lldb-mix] usage: dump [<addr|reg|sp|pc>] [len] "
-        "[-l len] [-w width]"
-    )
+    return "[lldb-mix] usage: dump [<addr|reg|sp|pc>] [len] " "[-l len] [-w width]"
 
 
 def cmd_db(debugger, command, result, internal_dict) -> None:
@@ -246,17 +243,26 @@ def _parse_simple_args(
     args: list[str], regs: dict[str, int]
 ) -> tuple[SimpleDumpArgs, str | None]:
     if len(args) > 2:
-        return SimpleDumpArgs(addr=0, length=DEFAULT_WORD_DUMP_LEN), "too many arguments"
+        return (
+            SimpleDumpArgs(addr=0, length=DEFAULT_WORD_DUMP_LEN),
+            "too many arguments",
+        )
 
     addr = resolve_addr(args[0], regs) if args else default_addr(regs)
     if addr is None:
-        return SimpleDumpArgs(addr=0, length=DEFAULT_WORD_DUMP_LEN), "invalid address or register"
+        return (
+            SimpleDumpArgs(addr=0, length=DEFAULT_WORD_DUMP_LEN),
+            "invalid address or register",
+        )
 
     length = DEFAULT_WORD_DUMP_LEN
     if len(args) == 2:
         parsed_len = parse_int(args[1])
         if parsed_len is None or parsed_len <= 0:
-            return SimpleDumpArgs(addr=0, length=DEFAULT_WORD_DUMP_LEN), "invalid length value"
+            return (
+                SimpleDumpArgs(addr=0, length=DEFAULT_WORD_DUMP_LEN),
+                "invalid length value",
+            )
         length = parsed_len
 
     return SimpleDumpArgs(addr=addr, length=length), None

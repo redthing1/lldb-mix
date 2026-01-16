@@ -13,7 +13,7 @@ def hexdump(
     for offset in range(0, len(data), bytes_per_line):
         chunk = data[offset : offset + bytes_per_line]
         hex_bytes = " ".join(f"{b:02x}" for b in chunk)
-        ascii_bytes = "".join(chr(b) if 0x20 <= b <= 0x7e else "." for b in chunk)
+        ascii_bytes = "".join(chr(b) if 0x20 <= b <= 0x7E else "." for b in chunk)
         pad = " " * (bytes_per_line * 3 - 1 - len(hex_bytes))
         addr_text = f"0x{base_addr + offset:016x}"
         if colorize:
@@ -52,9 +52,7 @@ def hexdump_words(
             words.append(f"{value:0{word_width}x}")
         hex_words = " ".join(words)
         pad = " " * max(total_hex_len - len(hex_words), 0)
-        ascii_bytes = "".join(
-            chr(b) if 0x20 <= b <= 0x7e else "." for b in chunk
-        )
+        ascii_bytes = "".join(chr(b) if 0x20 <= b <= 0x7E else "." for b in chunk)
         ascii_bytes += " " * (bytes_per_line - len(chunk))
         addr_text = f"0x{base_addr + offset:016x}"
         if colorize:

@@ -85,7 +85,9 @@ def _parse_args(
     count = _default_count()
 
     if not args:
-        addr = regs.get("pc") or regs.get("rip") or regs.get("eip") or default_addr(regs)
+        addr = (
+            regs.get("pc") or regs.get("rip") or regs.get("eip") or default_addr(regs)
+        )
         return addr or 0, count, None
 
     if len(args) > 2:

@@ -144,8 +144,6 @@ def _normalize_layout(value: object) -> list[str]:
     return normalized
 
 
-
-
 def _parse_bool(tokens: list[str]) -> bool:
     if len(tokens) != 1:
         raise ValueError("expected one value")

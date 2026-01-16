@@ -17,9 +17,9 @@ _QUIET_VALUES = {
     "stop-disassembly-count": "0",
     "stop-line-count-before": "0",
     "stop-line-count-after": "0",
-    "thread-stop-format": "\"\"",
-    "thread-format": "\"\"",
-    "frame-format": "\"\"",
+    "thread-stop-format": '""',
+    "thread-format": '""',
+    "frame-format": '""',
 }
 
 _DEFAULTS: dict[str, str] | None = None
@@ -71,9 +71,9 @@ def apply_quiet(debugger: Any) -> None:
         "settings set stop-disassembly-count 0",
         "settings set stop-line-count-before 0",
         "settings set stop-line-count-after 0",
-        "settings set -- thread-stop-format \"\"",
-        "settings set -- thread-format \"\"",
-        "settings set -- frame-format \"\"",
+        'settings set -- thread-stop-format ""',
+        'settings set -- thread-format ""',
+        'settings set -- frame-format ""',
     ):
         _run_command(debugger, command)
 

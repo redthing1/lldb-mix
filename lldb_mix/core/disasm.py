@@ -14,7 +14,9 @@ class Instruction:
     operands: str
 
 
-def read_instructions(target: Any, addr: int, count: int, flavor: str = "intel") -> list[Instruction]:
+def read_instructions(
+    target: Any, addr: int, count: int, flavor: str = "intel"
+) -> list[Instruction]:
     try:
         import lldb
     except Exception:

@@ -25,13 +25,11 @@ def format_regions_table(regions, ptr_size: int, target, lldb_module) -> list[st
                 "x" if region.execute else "-",
             ]
         )
-        name = (region.name or "")
+        name = region.name or ""
         if len(name) > 16:
             name = name[:16]
         path = _module_path(target, region.start, lldb_module)
-        lines.append(
-            f"{start} {end} {size} {prot:3} {name:16} {path}".rstrip()
-        )
+        lines.append(f"{start} {end} {size} {prot:3} {name:16} {path}".rstrip())
     return lines
 
 

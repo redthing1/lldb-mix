@@ -25,7 +25,9 @@ class PatchStore:
     def get(self, addr: int) -> PatchEntry | None:
         return self._entries.get(addr)
 
-    def add(self, addr: int, original: bytes, patched: bytes) -> tuple[bool, str | None]:
+    def add(
+        self, addr: int, original: bytes, patched: bytes
+    ) -> tuple[bool, str | None]:
         if not patched:
             return False, "patch is empty"
         if addr in self._entries:

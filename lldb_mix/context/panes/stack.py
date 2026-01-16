@@ -82,9 +82,7 @@ class StackPane(Pane):
         return lines
 
 
-def _frame_lines(
-    ctx: PaneContext, ptr_size: int, style
-) -> list[str]:
+def _frame_lines(ctx: PaneContext, ptr_size: int, style) -> list[str]:
     process = ctx.process
     if not process or not ctx.settings.stack_frame_lines:
         return []

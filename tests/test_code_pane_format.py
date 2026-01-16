@@ -178,5 +178,6 @@ class TestCodePaneFormat(unittest.TestCase):
             "target=0x0000000000002000 mod!target+0x4",
         )
 
+
 if __name__ == "__main__":
     unittest.main()

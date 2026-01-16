@@ -157,7 +157,9 @@ def _operand_annotations(
     for display, canon in reg_hits:
         value = regs[canon]
         addr_text = format_addr(value, ptr_size)
-        summary = _annotation_for_addr(value, reader, regions, resolver, settings, ptr_size)
+        summary = _annotation_for_addr(
+            value, reader, regions, resolver, settings, ptr_size
+        )
         if summary:
             pieces.append(f"{display}={addr_text}->{summary}")
         else:
@@ -166,7 +168,9 @@ def _operand_annotations(
     mem_addr = _compute_mem_addr(operands, regs, pattern)
     if mem_addr is not None:
         mem_text = format_addr(mem_addr, ptr_size)
-        summary = _annotation_for_addr(mem_addr, reader, regions, resolver, settings, ptr_size)
+        summary = _annotation_for_addr(
+            mem_addr, reader, regions, resolver, settings, ptr_size
+        )
         if summary:
             pieces.append(f"mem={mem_text}->{summary}")
         else:
@@ -174,7 +178,9 @@ def _operand_annotations(
     return pieces
 
 
-def _annotation_for_addr(addr, reader, regions, resolver, settings, ptr_size: int) -> str | None:
+def _annotation_for_addr(
+    addr, reader, regions, resolver, settings, ptr_size: int
+) -> str | None:
     if not reader or not settings or not settings.aggressive_deref:
         return None
     chain = deref_chain(addr, reader, regions or [], resolver, settings, ptr_size)
@@ -282,8 +288,6 @@ def _reg_value(token: str, regs: dict[str, int]) -> int | None:
     if not canon:
         return None
     return regs.get(canon)
-
-
 
 
 def _alias_registers(regs: dict[str, int]) -> dict[str, str]:

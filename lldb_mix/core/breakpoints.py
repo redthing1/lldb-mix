@@ -107,9 +107,7 @@ def _apply_spec(target, spec: BreakpointSpec):
     return None
 
 
-def _spec_for_address(
-    target, addr: int, enabled: bool
-) -> BreakpointSpec:
+def _spec_for_address(target, addr: int, enabled: bool) -> BreakpointSpec:
     module = module_for_address(target, addr)
     if module:
         base = module_base(target, module)

@@ -9,16 +9,13 @@ from lldb_mix.core.symbols import SymbolInfo
 
 
 class MemoryReader(Protocol):
-    def read(self, addr: int, size: int) -> bytes | None:
-        ...
+    def read(self, addr: int, size: int) -> bytes | None: ...
 
-    def read_pointer(self, addr: int, ptr_size: int) -> int | None:
-        ...
+    def read_pointer(self, addr: int, ptr_size: int) -> int | None: ...
 
 
 class SymbolResolver(Protocol):
-    def resolve(self, addr: int) -> SymbolInfo | None:
-        ...
+    def resolve(self, addr: int) -> SymbolInfo | None: ...
 
 
 def deref_chain(
@@ -77,7 +74,7 @@ def deref_chain(
         if target_region and target_region.read and not target_region.execute:
             string_val = read_cstring(reader, ptr, settings.max_string_length)
             if string_val:
-                chain.append(f"\"{string_val}\"")
+                chain.append(f'"{string_val}"')
                 break
 
         current = ptr
@@ -98,7 +95,7 @@ def summarize_chain(chain: list[str]) -> str | None:
 def classify_token(token: str) -> str:
     if token == "[loop]":
         return "loop"
-    if token.startswith("\"") and token.endswith("\""):
+    if token.startswith('"') and token.endswith('"'):
         return "string"
     if "!" in token:
         return "symbol"
@@ -143,7 +140,7 @@ def read_cstring(reader: MemoryReader, addr: int, max_len: int) -> str | None:
 
 def is_printable_ascii(data: bytes) -> bool:
     for byte in data:
-        if byte < 0x20 or byte > 0x7e:
+        if byte < 0x20 or byte > 0x7E:
             return False
     return True
 

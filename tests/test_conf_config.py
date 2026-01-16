@@ -14,9 +14,7 @@ class TestConfConfig(unittest.TestCase):
 
     def test_set_layout_dedup(self):
         settings = Settings()
-        ok, value = set_setting(
-            settings, "layout", ["regs", "stack", "regs", "code"]
-        )
+        ok, value = set_setting(settings, "layout", ["regs", "stack", "regs", "code"])
         self.assertTrue(ok)
         self.assertEqual(value, "regs stack code")
         self.assertEqual(settings.layout, ["regs", "stack", "code"])

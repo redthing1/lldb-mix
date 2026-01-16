@@ -43,9 +43,7 @@ class TestLldbIntegration(unittest.TestCase):
             if not os.path.isfile(binary):
                 raise unittest.SkipTest("sample binary not produced")
 
-            expanded = [
-                cmd.replace("{session}", session_path) for cmd in commands
-            ]
+            expanded = [cmd.replace("{session}", session_path) for cmd in commands]
             full_commands = [f"command script import {loader}"] + expanded
             if not any(cmd.strip() == "quit" for cmd in full_commands):
                 full_commands.append("quit")
