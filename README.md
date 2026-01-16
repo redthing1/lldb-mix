@@ -1,6 +1,7 @@
+
 # lldb-mix
 
-a modern lldb context ui for binary-first debugging
+a modern, context-aware ui for binary-first debugging with **lldb**. inspired by [gef](https://github.com/hugsy/gef) and [lldbinit](https://github.com/gdbinit/lldbinit).
 
 ![screenshot](./media/lldb_mix_screen1.jpg)
 
