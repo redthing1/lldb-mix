@@ -1,16 +1,9 @@
 from __future__ import annotations
 
+from lldb_mix.context.formatting import deref_summary, format_deref_suffix
 from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.types import PaneContext
-from lldb_mix.deref import (
-    classify_token,
-    deref_chain,
-    format_addr,
-    format_symbol,
-    last_addr,
-    region_tag,
-    summarize_chain,
-)
+from lldb_mix.deref import format_addr, format_symbol
 
 
 class StackPane(Pane):
@@ -24,7 +17,7 @@ class StackPane(Pane):
         sp = snapshot.sp
         ptr_size = arch.ptr_size or 8
 
-        if sp == 0:
+        if not snapshot.has_sp():
             lines.append("(sp unavailable)")
             return lines
         if not ctx.reader or not hasattr(ctx.reader, "read_pointer"):
@@ -52,30 +45,9 @@ class StackPane(Pane):
             label = self.style(ctx, ": ", "label")
             line = f"{addr_text}{label}{value_colored}"
 
-            if ctx.settings.aggressive_deref:
-                chain = deref_chain(
-                    value,
-                    ctx.reader,
-                    snapshot.maps,
-                    ctx.resolver,
-                    ctx.settings,
-                    ptr_size,
-                )
-                summary = summarize_chain(chain)
-                if summary:
-                    kind = classify_token(summary)
-                    if kind in ("string", "symbol", "region"):
-                        role = "string" if kind == "string" else "symbol"
-                        if kind == "region":
-                            role = "muted"
-                        arrow = self.style(ctx, "->", "arrow")
-                        summary_text = self.style(ctx, summary, role)
-                        line = f"{line} {arrow} {summary_text}"
-                        if kind == "symbol":
-                            tag = region_tag(last_addr(chain), snapshot.maps)
-                            if tag:
-                                tag_text = self.style(ctx, tag, "muted")
-                                line = f"{line} {tag_text}"
+            info = deref_summary(ctx, value, ptr_size)
+            if info:
+                line = f"{line} {format_deref_suffix(self, ctx, info)}"
 
             lines.append(line)
 

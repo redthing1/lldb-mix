@@ -23,13 +23,16 @@ def parse_int(text: str) -> int | None:
 
 
 def default_addr(regs: dict[str, int]) -> int | None:
-    for name in ("sp", "rsp", "esp"):
-        if name in regs and regs[name]:
-            return regs[name]
-    for name in ("pc", "rip", "eip"):
-        if name in regs and regs[name]:
-            return regs[name]
-    return None
+    sp = _pick_reg(("sp", "rsp", "esp"), regs, require_nonzero=True)
+    if sp is not None:
+        return sp
+    pc = _pick_reg(("pc", "rip", "eip"), regs, require_nonzero=True)
+    if pc is not None:
+        return pc
+    sp = _pick_reg(("sp", "rsp", "esp"), regs, require_nonzero=False)
+    if sp is not None:
+        return sp
+    return _pick_reg(("pc", "rip", "eip"), regs, require_nonzero=False)
 
 
 def resolve_addr(token: str, regs: dict[str, int]) -> int | None:
@@ -38,9 +41,9 @@ def resolve_addr(token: str, regs: dict[str, int]) -> int | None:
         cleaned = cleaned[1:]
     key = cleaned.lower()
     if key == "sp":
-        return _pick_reg(("sp", "rsp", "esp"), regs)
+        return _pick_reg(("sp", "rsp", "esp"), regs, require_nonzero=False)
     if key == "pc":
-        return _pick_reg(("pc", "rip", "eip"), regs)
+        return _pick_reg(("pc", "rip", "eip"), regs, require_nonzero=False)
     if key in regs:
         return regs[key]
     parsed = parse_int(cleaned)
@@ -74,9 +77,16 @@ def eval_expression(frame, expr: str) -> int | None:
             return None
 
 
-def _pick_reg(candidates: tuple[str, ...], regs: dict[str, int]) -> int | None:
+def _pick_reg(
+    candidates: tuple[str, ...],
+    regs: dict[str, int],
+    require_nonzero: bool,
+) -> int | None:
     for name in candidates:
-        value = regs.get(name)
-        if value:
-            return value
+        if name not in regs:
+            continue
+        value = regs[name]
+        if require_nonzero and value == 0:
+            continue
+        return value
     return None

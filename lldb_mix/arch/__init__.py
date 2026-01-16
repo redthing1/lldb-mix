@@ -1,1 +1,1 @@
-__all__ = ["abi", "base", "x64", "arm64", "registry"]
+__all__ = ["abi", "base", "x64", "arm64", "riscv", "registry"]

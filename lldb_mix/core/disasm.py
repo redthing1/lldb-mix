@@ -53,14 +53,14 @@ def read_instructions(
 
 def read_instructions_around(
     target: Any,
-    pc: int,
+    pc: int | None,
     before: int,
     after: int,
     arch: ArchSpec,
     flavor: str = "intel",
 ) -> list[Instruction]:
     total = before + after + 1
-    if pc == 0 or total <= 0:
+    if pc is None or total <= 0:
         return []
 
     if before <= 0:

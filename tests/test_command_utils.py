@@ -17,6 +17,10 @@ class TestCommandUtils(unittest.TestCase):
         regs = {"sp": 0, "pc": 0x2000}
         self.assertEqual(default_addr(regs), 0x2000)
 
+    def test_default_addr_returns_zero_when_only_zero(self):
+        regs = {"sp": 0, "pc": 0}
+        self.assertEqual(default_addr(regs), 0)
+
     def test_resolve_addr_sp_alias(self):
         regs = {"rsp": 0x1111}
         self.assertEqual(resolve_addr("sp", regs), 0x1111)
@@ -25,6 +29,10 @@ class TestCommandUtils(unittest.TestCase):
     def test_resolve_addr_pc_alias(self):
         regs = {"rip": 0x2222}
         self.assertEqual(resolve_addr("pc", regs), 0x2222)
+
+    def test_resolve_addr_pc_zero(self):
+        regs = {"pc": 0}
+        self.assertEqual(resolve_addr("pc", regs), 0)
 
     def test_resolve_addr_reg_value(self):
         regs = {"rax": 0x3333}

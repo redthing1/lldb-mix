@@ -91,8 +91,8 @@ class ArgsPane(Pane):
         return self.style(ctx, f"abi: {name}", "muted")
 
 
-def _current_call_inst(ctx: PaneContext, arch, pc: int):
-    if not ctx.target or pc == 0:
+def _current_call_inst(ctx: PaneContext, arch, pc: int | None):
+    if not ctx.target or pc is None:
         return None
     flavor = disasm_flavor(arch.name)
     try:

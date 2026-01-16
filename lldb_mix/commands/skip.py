@@ -40,7 +40,7 @@ def cmd_skip(debugger, command, result, internal_dict) -> None:
         return
 
     pc = snapshot.pc
-    if pc == 0:
+    if not snapshot.has_pc():
         emit_result(result, "[lldb-mix] pc unavailable", lldb)
         return
 

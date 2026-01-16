@@ -24,7 +24,7 @@ class FlowPane(Pane):
         pc = snapshot.pc
         ptr_size = arch.ptr_size or 8
 
-        if pc == 0:
+        if not snapshot.has_pc():
             lines.append("(pc unavailable)")
             return lines
         if not ctx.target:
@@ -59,7 +59,7 @@ class FlowPane(Pane):
 
 def _current_inst(ctx: PaneContext):
     pc = ctx.snapshot.pc
-    if pc == 0 or not ctx.target:
+    if not ctx.snapshot.has_pc() or not ctx.target:
         return None
     flavor = disasm_flavor(ctx.snapshot.arch.name)
     try:

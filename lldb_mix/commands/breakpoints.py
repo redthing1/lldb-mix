@@ -145,7 +145,7 @@ def cmd_bpn(debugger, command, result, internal_dict) -> None:
         return
 
     pc = snapshot.pc
-    if pc == 0:
+    if not snapshot.has_pc():
         emit_result(result, "[lldb-mix] bpn pc unavailable", lldb)
         return
 

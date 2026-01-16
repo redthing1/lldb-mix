@@ -46,8 +46,8 @@ def cmd_u(debugger, command, result, internal_dict) -> None:
         emit_result(result, "[lldb-mix] target unavailable", lldb)
         return
 
-    if addr == 0:
-        emit_result(result, "[lldb-mix] u address is 0", lldb)
+    if addr is None:
+        emit_result(result, "[lldb-mix] u address unavailable", lldb)
         return
 
     flavor = disasm_flavor(snapshot.arch.name)
@@ -81,28 +81,28 @@ def _parse_args(
     args: list[str],
     regs: dict[str, int],
     frame,
-) -> tuple[int, int, str | None]:
+) -> tuple[int | None, int, str | None]:
     count = _default_count()
 
     if not args:
-        addr = (
-            regs.get("pc") or regs.get("rip") or regs.get("eip") or default_addr(regs)
-        )
-        return addr or 0, count, None
+        addr = resolve_addr("pc", regs)
+        if addr is None:
+            addr = default_addr(regs)
+        return addr, count, None
 
     if len(args) > 2:
-        return 0, count, "too many arguments"
+        return None, count, "too many arguments"
 
     addr = resolve_addr(args[0], regs)
     if addr is None:
         addr = eval_expression(frame, args[0])
     if addr is None:
-        return 0, count, "invalid address or expression"
+        return None, count, "invalid address or expression"
 
     if len(args) == 2:
         parsed = parse_int(args[1])
         if parsed is None or parsed <= 0:
-            return 0, count, "invalid count"
+            return None, count, "invalid count"
         count = parsed
 
     return addr, count, None

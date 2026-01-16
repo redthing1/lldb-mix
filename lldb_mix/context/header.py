@@ -38,16 +38,17 @@ def _build_header_line(ctx: PaneContext, term_width: int) -> str:
     if stop:
         parts.append(("stop", stop, "value"))
 
-    if snapshot.pc:
+    if snapshot.has_pc():
         parts.append(("pc", format_addr(snapshot.pc, ptr_size), "addr"))
 
     sym_text = ""
-    if ctx.resolver:
-        symbol = ctx.resolver.resolve(snapshot.pc)
-        if symbol:
-            sym_text = format_symbol(symbol)
-    if not sym_text and target:
-        sym_text = format_module_offset(target, snapshot.pc) or ""
+    if snapshot.has_pc():
+        if ctx.resolver:
+            symbol = ctx.resolver.resolve(snapshot.pc)
+            if symbol:
+                sym_text = format_symbol(symbol)
+        if not sym_text and target:
+            sym_text = format_module_offset(target, snapshot.pc) or ""
     if sym_text:
         parts.append(("sym", sym_text, "symbol"))
 
