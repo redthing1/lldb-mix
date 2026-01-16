@@ -3,13 +3,19 @@ from __future__ import annotations
 from lldb_mix.context.panes.base import Pane
 from lldb_mix.context.types import PaneContext
 from lldb_mix.core.disasm import read_instructions
-from lldb_mix.core.flow import resolve_flow_target
+from lldb_mix.core.flow import is_branch_like, resolve_flow_target
 from lldb_mix.deref import format_addr, format_symbol
 
 
 class FlowPane(Pane):
     name = "flow"
     column = 0
+
+    def visible(self, ctx: PaneContext) -> bool:
+        inst = _current_inst(ctx)
+        if not inst:
+            return False
+        return is_branch_like(inst.mnemonic)
 
     def render(self, ctx: PaneContext) -> list[str]:
         snapshot = ctx.snapshot
@@ -25,12 +31,10 @@ class FlowPane(Pane):
             lines.append("(target unavailable)")
             return lines
 
-        insts = read_instructions(ctx.target, pc, 1)
-        if not insts:
+        inst = _current_inst(ctx)
+        if not inst:
             lines.append("(flow unavailable)")
             return lines
-
-        inst = insts[0]
         mnemonic = self.style(ctx, inst.mnemonic, "mnemonic")
         if inst.operands:
             lines.append(f"{mnemonic} {inst.operands}")
@@ -51,3 +55,19 @@ class FlowPane(Pane):
         label = self.style(ctx, "target:", "label")
         lines.append(f"{label} {target_line}")
         return lines
+
+
+def _current_inst(ctx: PaneContext):
+    pc = ctx.snapshot.pc
+    if pc == 0 or not ctx.target:
+        return None
+    try:
+        insts = read_instructions(ctx.target, pc, 1)
+    except Exception:
+        return None
+    if not insts:
+        return None
+    inst = insts[0]
+    if inst.address != pc:
+        return None
+    return inst

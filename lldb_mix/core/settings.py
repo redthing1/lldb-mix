@@ -8,7 +8,16 @@ class Settings:
     enable_color: bool = True
     theme: str = "base"
     layout: list[str] = field(
-        default_factory=lambda: ["regs", "args", "stack", "code", "source"]
+        default_factory=lambda: [
+            "regs",
+            "args",
+            "flow",
+            "stack",
+            "threads",
+            "watch",
+            "code",
+            "source",
+        ]
     )
     abi: str = "auto"
     aggressive_deref: bool = True

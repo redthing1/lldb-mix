@@ -30,6 +30,15 @@ class ThreadsPane(Pane):
     name = "threads"
     column = 0
 
+    def visible(self, ctx: PaneContext) -> bool:
+        process = ctx.process
+        if not process:
+            return False
+        try:
+            return process.GetNumThreads() > 1
+        except Exception:
+            return False
+
     def render(self, ctx: PaneContext) -> list[str]:
         lines = [self.title(ctx)]
         process = ctx.process
