@@ -2,11 +2,17 @@
 
 Clean, modular LLDB context UI focused on binary-first debugging.
 
-## Quick Start
+## install
+
+```sh
+./scripts/install.py
+```
+
+## quick start
 
 ```
-command script import /path/to/lldb-mix/lldb_mix_loader.py
-context
+lldb /path/to/bin
+(lldb) context
 ```
 
 ## Usage
