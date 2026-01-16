@@ -1,8 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterable
 
+from lldb_mix.arch.reginfo import (
+    RegInfo,
+    find_named_reg,
+    find_reg_by_value,
+    normalize_reg_info,
+    normalize_reg_name,
+    normalize_reg_values,
+    select_gpr_set,
+)
 
 _PC_CANDIDATES = ("pc", "rip", "eip")
 _SP_CANDIDATES = ("sp", "rsp", "esp")
@@ -15,7 +24,7 @@ class ArchInfo:
     arch_name: str
     ptr_size: int
     gpr_names: tuple[str, ...]
-    reg_sets: dict[str, tuple[str, ...]]
+    reg_sets: dict[str, tuple[RegInfo, ...]]
     pc_value: int | None
     sp_value: int | None
     pc_reg_name: str | None
@@ -28,12 +37,18 @@ class ArchInfo:
         arch_name = _safe_get_arch_name(target, triple)
         ptr_size = _safe_get_ptr_size(target)
         reg_sets = _safe_get_reg_sets(frame)
-        gpr_names = _select_gpr_set(reg_sets)
+        gpr_regs = select_gpr_set(reg_sets, ptr_size, _PC_CANDIDATES, _SP_CANDIDATES)
+        gpr_names = tuple(reg.name for reg in gpr_regs)
         pc_value = _safe_get_pc(frame)
         sp_value = _safe_get_sp(frame)
-        pc_reg_name = _find_candidate(gpr_names, _PC_CANDIDATES)
-        sp_reg_name = _find_candidate(gpr_names, _SP_CANDIDATES)
-        flags_reg_name = _find_candidate(gpr_names, _FLAGS_CANDIDATES)
+        reg_values = _safe_get_reg_values(frame)
+        pc_reg_name = find_named_reg(gpr_names, reg_sets, _PC_CANDIDATES)
+        sp_reg_name = find_named_reg(gpr_names, reg_sets, _SP_CANDIDATES)
+        flags_reg_name = find_named_reg(gpr_names, reg_sets, _FLAGS_CANDIDATES)
+        if pc_reg_name is None and pc_value is not None:
+            pc_reg_name = find_reg_by_value(reg_sets, reg_values, ptr_size, pc_value)
+        if sp_reg_name is None and sp_value is not None:
+            sp_reg_name = find_reg_by_value(reg_sets, reg_values, ptr_size, sp_value)
         return ArchInfo(
             triple=triple,
             arch_name=arch_name,
@@ -52,24 +67,34 @@ class ArchInfo:
         triple: str,
         arch_name: str,
         ptr_size: int,
-        reg_sets: dict[str, list[str] | tuple[str, ...]],
+        reg_sets: dict[str, Iterable[RegInfo | str | tuple[str, int]]],
         pc_value: int | None = None,
         sp_value: int | None = None,
+        reg_values: dict[str, int] | None = None,
         pc_reg_name: str | None = None,
         sp_reg_name: str | None = None,
         flags_reg_name: str | None = None,
     ) -> "ArchInfo":
-        normalized = {
-            name: tuple(_normalize_reg_name(reg) for reg in regs if reg)
-            for name, regs in reg_sets.items()
-        }
-        gpr_names = _select_gpr_set(normalized)
+        normalized = {name: tuple(normalize_reg_info(regs)) for name, regs in reg_sets.items()}
+        gpr_regs = select_gpr_set(normalized, ptr_size, _PC_CANDIDATES, _SP_CANDIDATES)
+        gpr_names = tuple(reg.name for reg in gpr_regs)
+        reg_values_norm = normalize_reg_values(reg_values)
         if not pc_reg_name:
-            pc_reg_name = _find_candidate(gpr_names, _PC_CANDIDATES)
+            pc_reg_name = find_named_reg(gpr_names, normalized, _PC_CANDIDATES)
+            if pc_reg_name is None and pc_value is not None:
+                pc_reg_name = find_reg_by_value(
+                    normalized, reg_values_norm, ptr_size, pc_value
+                )
         if not sp_reg_name:
-            sp_reg_name = _find_candidate(gpr_names, _SP_CANDIDATES)
+            sp_reg_name = find_named_reg(gpr_names, normalized, _SP_CANDIDATES)
+            if sp_reg_name is None and sp_value is not None:
+                sp_reg_name = find_reg_by_value(
+                    normalized, reg_values_norm, ptr_size, sp_value
+                )
         if not flags_reg_name:
-            flags_reg_name = _find_candidate(gpr_names, _FLAGS_CANDIDATES)
+            flags_reg_name = find_named_reg(
+                gpr_names, normalized, _FLAGS_CANDIDATES
+            )
         return ArchInfo(
             triple=triple or "",
             arch_name=arch_name or "",
@@ -134,8 +159,8 @@ def _safe_get_sp(frame: Any | None) -> int | None:
         return None
 
 
-def _safe_get_reg_sets(frame: Any | None) -> dict[str, tuple[str, ...]]:
-    reg_sets: dict[str, tuple[str, ...]] = {}
+def _safe_get_reg_sets(frame: Any | None) -> dict[str, tuple[RegInfo, ...]]:
+    reg_sets: dict[str, tuple[RegInfo, ...]] = {}
     if not frame:
         return reg_sets
     try:
@@ -159,7 +184,7 @@ def _safe_get_reg_sets(frame: Any | None) -> dict[str, tuple[str, ...]]:
             set_name = reg_set.GetName() or f"reg_set_{idx}"
         except Exception:
             set_name = f"reg_set_{idx}"
-        names: list[str] = []
+        regs: list[RegInfo] = []
         try:
             child_count = reg_set.GetNumChildren()
         except Exception:
@@ -177,36 +202,40 @@ def _safe_get_reg_sets(frame: Any | None) -> dict[str, tuple[str, ...]]:
                 reg_name = ""
             if not reg_name:
                 continue
-            names.append(_normalize_reg_name(reg_name))
-        reg_sets[set_name] = tuple(names)
+            try:
+                byte_size = int(reg.GetByteSize() or 0)
+            except Exception:
+                byte_size = 0
+            regs.append(
+                RegInfo(name=normalize_reg_name(reg_name), byte_size=byte_size)
+            )
+        reg_sets[set_name] = tuple(regs)
     return reg_sets
 
 
-def _select_gpr_set(reg_sets: dict[str, tuple[str, ...]]) -> tuple[str, ...]:
-    if not reg_sets:
-        return ()
-    candidates: list[tuple[int, tuple[str, ...]]] = []
-    for name, regs in reg_sets.items():
-        lower = (name or "").lower()
-        if ("general" in lower and "purpose" in lower) or "gpr" in lower:
-            candidates.append((len(regs), regs))
-    if candidates:
-        candidates.sort(key=lambda item: item[0], reverse=True)
-        return candidates[0][1]
-    # Fallback: choose the largest register set.
-    fallback = max(reg_sets.values(), key=len, default=())
-    return fallback
-
-
-def _find_candidate(names: tuple[str, ...], candidates: tuple[str, ...]) -> str | None:
-    if not names:
-        return None
-    name_set = {name.lower() for name in names}
-    for candidate in candidates:
-        if candidate in name_set:
-            return candidate
-    return None
+def _safe_get_reg_values(frame: Any | None) -> dict[str, int]:
+    values: dict[str, int] = {}
+    if not frame:
+        return values
+    try:
+        sets = frame.GetRegisters()
+    except Exception:
+        return values
+    for reg_set in sets:
+        for reg in reg_set:
+            try:
+                name = reg.GetName() or ""
+            except Exception:
+                name = ""
+            if not name:
+                continue
+            try:
+                value = int(reg.GetValueAsUnsigned())
+            except Exception:
+                continue
+            values[_normalize_reg_name(name)] = value
+    return values
 
 
 def _normalize_reg_name(name: str) -> str:
-    return (name or "").strip().lower()
+    return normalize_reg_name(name)

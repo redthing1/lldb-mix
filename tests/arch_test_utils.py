@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from lldb_mix.arch.info import ArchInfo
+from lldb_mix.arch.reginfo import RegInfo
 from lldb_mix.arch.view import ArchView
 
 
@@ -12,7 +13,12 @@ def make_arch_view(
     sp_value: int | None = None,
 ) -> ArchView:
     regs = gpr_names or getattr(profile, "gpr_names", ())
-    reg_sets = {"General Purpose Registers": list(regs)}
+    reg_sets = {
+        "General Purpose Registers": [
+            RegInfo(name=reg, byte_size=ptr_size or getattr(profile, "ptr_size", 0))
+            for reg in regs
+        ]
+    }
     info = ArchInfo.from_register_sets(
         triple=getattr(profile, "name", ""),
         arch_name=getattr(profile, "name", ""),
