@@ -50,7 +50,8 @@ class ArchView:
     @property
     def flags_reg(self) -> str | None:
         if self.profile and getattr(self.profile, "flags_reg", None):
-            return self.profile.flags_reg
+            if self.profile.flags_reg in self.info.gpr_names:
+                return self.profile.flags_reg
         return self.info.flags_reg_name
 
     @property

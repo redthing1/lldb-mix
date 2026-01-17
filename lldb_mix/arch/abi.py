@@ -57,6 +57,13 @@ AAPCS64 = AbiSpec(
     caller_saved=("x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"),
 )
 
+AAPCS32 = AbiSpec(
+    name="aapcs32",
+    int_arg_regs=("r0", "r1", "r2", "r3"),
+    return_reg="r0",
+    stack_alignment=8,
+)
+
 RISCV_ABI = AbiSpec(
     name="riscv",
     int_arg_regs=("a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7"),
@@ -76,6 +83,7 @@ ABI_BY_NAME = {
     SYSV_X64.name: SYSV_X64,
     WIN64.name: WIN64,
     AAPCS64.name: AAPCS64,
+    AAPCS32.name: AAPCS32,
     RISCV_ABI.name: RISCV_ABI,
     RISCV_X_ABI.name: RISCV_X_ABI,
 }
@@ -84,6 +92,7 @@ ABI_ARCHES = {
     "sysv": ("x86_64", "amd64"),
     "win64": ("x86_64", "amd64"),
     "aapcs64": ("arm64", "aarch64"),
+    "aapcs32": ("arm32", "armv", "thumb"),
     "riscv": ("riscv64", "riscv32", "riscv"),
     "riscv-x": ("riscv64", "riscv32", "riscv"),
 }
@@ -121,6 +130,8 @@ def select_abi(triple: str, arch_name: str) -> AbiSpec | None:
 
     if "arm64" in arch_lower or "aarch64" in arch_lower:
         return AAPCS64
+    if "arm" in arch_lower or "thumb" in arch_lower:
+        return AAPCS32
     if "riscv" in arch_lower:
         return RISCV_ABI
 

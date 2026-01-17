@@ -1,5 +1,6 @@
 import unittest
 
+from lldb_mix.arch.arm32 import ARM32_ARCH
 from lldb_mix.arch.arm64 import ARM64_ARCH
 from lldb_mix.arch.x64 import X64_ARCH
 
@@ -16,6 +17,12 @@ class TestArchFlags(unittest.TestCase):
         c = 1 << 29
         flags = n | c
         self.assertEqual(ARM64_ARCH.format_flags(flags), "N z C v a i f")
+
+    def test_arm32_format_flags(self):
+        n = 1 << 31
+        c = 1 << 29
+        flags = n | c
+        self.assertEqual(ARM32_ARCH.format_flags(flags), "N z C v q a i f t")
 
     def test_x64_branch_taken(self):
         zf = 1 << 6

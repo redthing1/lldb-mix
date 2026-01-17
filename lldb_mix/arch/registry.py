@@ -8,15 +8,11 @@ from typing import Callable
 from lldb_mix.arch.abi import abi_matches_arch, lookup_abi, select_abi
 from lldb_mix.arch.base import ArchProfile
 from lldb_mix.arch.info import ArchInfo
+from lldb_mix.arch.match import allows_family, explicit_family, family_in_text
 from lldb_mix.arch.view import ArchView
 
 _MATCHERS: list[tuple[ArchProfile, Callable[[ArchInfo], int]]] = []
 _PROFILES_LOADED = False
-_ARCH_FAMILIES: dict[str, tuple[str, ...]] = {
-    "x86_64": ("x86_64", "amd64", "x64"),
-    "arm64": ("arm64", "aarch64"),
-    "riscv": ("riscv", "rv32", "rv64"),
-}
 
 
 def register_profile(profile: ArchProfile, matcher: Callable[[ArchInfo], int]) -> None:
@@ -53,6 +49,11 @@ def select_profile(info: ArchInfo) -> ArchProfile | None:
     best: ArchProfile | None = None
     best_score = 0
     for profile, matcher in _MATCHERS:
+        profile_family = explicit_family(profile.name or "")
+        if profile_family and not allows_family(
+            info.triple, info.arch_name, profile_family
+        ):
+            continue
         if family and not _profile_matches_family(profile, family):
             continue
         try:
@@ -68,20 +69,15 @@ def select_profile(info: ArchInfo) -> ArchProfile | None:
 
 
 def _explicit_family(info: ArchInfo) -> str | None:
-    text = f"{info.triple} {info.arch_name}".lower()
-    matches = [
-        name for name, tokens in _ARCH_FAMILIES.items() if any(t in text for t in tokens)
-    ]
-    if len(matches) == 1:
-        return matches[0]
-    return None
+    triple_family = explicit_family(info.triple or "")
+    if triple_family:
+        return triple_family
+    return explicit_family(info.arch_name or "")
 
 
 def _profile_matches_family(profile: ArchProfile, family: str) -> bool:
-    name = (profile.name or "").lower()
-    if family == "x86_64":
-        return "x86_64" in name or "amd64" in name or name == "x64"
-    return family in name
+    name = profile.name or ""
+    return family_in_text(name, family)
 
 
 def _ensure_profiles_loaded() -> None:

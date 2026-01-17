@@ -419,14 +419,18 @@ def _match_riscv(info: ArchInfo, bits: int, prefer_abi: bool) -> int:
         score += 5
 
     if prefer_abi:
-        if regs.intersection({"a0", "a1", "ra", "sp", "gp", "tp", "zero"}):
+        if regs.intersection({"a0", "a1", "ra", "gp", "tp", "zero"}):
             score += 30
+        elif "sp" in regs:
+            score += 5
         elif regs.intersection({"x10", "x1", "x2"}):
             score -= 5
     else:
-        if regs.intersection({"x0", "x1", "x2", "x10"}):
+        if regs.intersection({"x0", "x1", "x10"}):
             score += 30
-        elif regs.intersection({"a0", "ra", "sp"}):
+        elif "x2" in regs:
+            score += 5
+        elif regs.intersection({"a0", "ra"}):
             score -= 5
 
     return score
