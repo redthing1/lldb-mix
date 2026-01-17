@@ -13,8 +13,20 @@ def cmd_rr(debugger, command, result, internal_dict) -> None:
     launch_cmd = _build_launch_cmd(command)
 
     res = lldb.SBCommandReturnObject()
-    debugger.SetAsync(True)
-    debugger.GetCommandInterpreter().HandleCommand(launch_cmd, res)
+    was_async = None
+    try:
+        was_async = debugger.GetAsync()
+        debugger.SetAsync(False)
+    except Exception:
+        was_async = None
+    try:
+        debugger.GetCommandInterpreter().HandleCommand(launch_cmd, res)
+    finally:
+        if was_async is not None:
+            try:
+                debugger.SetAsync(was_async)
+            except Exception:
+                pass
 
     if not res.Succeeded():
         err = res.GetError() or "unknown error"

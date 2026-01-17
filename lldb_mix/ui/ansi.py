@@ -5,6 +5,12 @@ from enum import Enum
 from typing import Iterable, Union
 
 
+ESC = "\x1b"
+CSI = f"{ESC}["
+CLEAR_LINE = f"{CSI}2K"
+CARRIAGE_RETURN = "\r"
+
+
 class Color(Enum):
     BLACK = 30
     RED = 31
@@ -55,10 +61,10 @@ def escape(tokens: Iterable[AnsiToken]) -> str:
     codes = [str(token.value) for token in tokens]
     if not codes:
         return ""
-    return f"\x1b[{';'.join(codes)}m"
+    return f"{CSI}{';'.join(codes)}m"
 
 
-RESET = "\x1b[0m"
+RESET = f"{CSI}0m"
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
