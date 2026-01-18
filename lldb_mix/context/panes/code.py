@@ -491,6 +491,8 @@ def _inst_comment(ctx: PaneContext, inst, ptr_size: int, flags: int) -> str | No
                 symbol = ctx.resolver.resolve(target)
                 if symbol:
                     target_text = f"{target_text} {format_symbol(symbol)}"
+            if not _target_disasm_available(ctx, target):
+                target_text = f"{target_text} (unavailable)"
             comment_parts.append(f"target={target_text}")
 
     if not comment_parts:
@@ -505,6 +507,18 @@ def _fallthrough_addr(insts, current_idx: int) -> int | None:
     if current.byte_size > 0:
         return current.address + current.byte_size
     return None
+
+
+def _target_disasm_available(ctx: PaneContext, addr: int) -> bool:
+    target = ctx.target
+    if not target or not hasattr(target, "ReadInstructions") or not hasattr(target, "IsValid"):
+        return True
+    flavor = ctx.snapshot.arch.disasm_flavor()
+    try:
+        insts = read_instructions(target, addr, 1, flavor)
+    except Exception:
+        return True
+    return bool(insts)
 
 
 def _join_branch_blocks(
