@@ -33,6 +33,19 @@ class TestSkipCommand(unittest.TestCase):
         target = skip._compute_target(0x1000, insts, 2)
         self.assertEqual(target, 0x1003)
 
+    def test_compute_target_uses_byte_size(self):
+        insts = [
+            Instruction(
+                address=0x1000,
+                bytes=b"",
+                mnemonic="nop",
+                operands="",
+                byte_size=4,
+            ),
+        ]
+        target = skip._compute_target(0x1000, insts, 1)
+        self.assertEqual(target, 0x1004)
+
     def test_compute_target_missing_bytes(self):
         insts = [
             Instruction(address=0x1000, bytes=b"", mnemonic="nop", operands=""),

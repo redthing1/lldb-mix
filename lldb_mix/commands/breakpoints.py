@@ -144,9 +144,12 @@ def cmd_bpn(debugger, command, result, internal_dict) -> None:
 
     flavor = snapshot.arch.disasm_flavor()
     insts = read_instructions(target, pc, 1, flavor=flavor)
-    size = len(insts[0].bytes) if insts else snapshot.arch.max_inst_bytes
-    if size <= 0:
+    if not insts or insts[0].address != pc:
         emit_result(result, "[lldb-mix] failed to read instruction", lldb)
+        return
+    size = insts[0].byte_size
+    if size <= 0:
+        emit_result(result, "[lldb-mix] instruction size unavailable", lldb)
         return
 
     next_addr = pc + size

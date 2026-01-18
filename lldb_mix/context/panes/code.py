@@ -101,7 +101,7 @@ _REG_BOUNDARY = r"(?<![A-Za-z0-9_])(?:{name})(?![A-Za-z0-9_])"
 def _opcode_texts(insts, show_opcodes: bool) -> tuple[list[str], int]:
     if not show_opcodes:
         return [""] * len(insts), 0
-    texts = [" ".join(f"{b:02x}" for b in inst.bytes) for inst in insts]
+    texts = [" ".join(f"{b:02x}" for b in inst.opcode_bytes) for inst in insts]
     pad = max((len(text) for text in texts), default=0)
     return texts, pad
 
@@ -320,7 +320,7 @@ def _render_branch_split(
         read_pointer=read_pointer,
         ptr_size=state.ptr_size,
     )
-    fallthrough = _fallthrough_addr(insts, current_idx, arch)
+    fallthrough = _fallthrough_addr(insts, current_idx)
     if target is None or fallthrough is None:
         return None
 
@@ -498,14 +498,12 @@ def _inst_comment(ctx: PaneContext, inst, ptr_size: int, flags: int) -> str | No
     return "; " + " | ".join(comment_parts)
 
 
-def _fallthrough_addr(insts, current_idx: int, arch) -> int | None:
+def _fallthrough_addr(insts, current_idx: int) -> int | None:
     if current_idx + 1 < len(insts):
         return insts[current_idx + 1].address
     current = insts[current_idx]
-    if current.bytes:
-        return current.address + len(current.bytes)
-    if arch.max_inst_bytes:
-        return current.address + arch.max_inst_bytes
+    if current.byte_size > 0:
+        return current.address + current.byte_size
     return None
 
 

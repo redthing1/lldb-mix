@@ -85,9 +85,11 @@ def _parse_count(args: list[str]) -> tuple[int, str | None]:
 def _compute_target(pc: int, insts: list, count: int) -> int | None:
     if count <= 0 or len(insts) < count:
         return None
+    if insts[0].address != pc:
+        return None
     total = 0
     for inst in insts[:count]:
-        size = len(inst.bytes)
+        size = inst.byte_size
         if size <= 0:
             return None
         total += size

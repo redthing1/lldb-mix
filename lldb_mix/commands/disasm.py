@@ -119,7 +119,7 @@ def _format_instructions(
     bytes_texts: list[str] = []
     if show_opcodes:
         for inst in insts:
-            bytes_texts.append(" ".join(f"{b:02x}" for b in inst.bytes))
+            bytes_texts.append(" ".join(f"{b:02x}" for b in inst.opcode_bytes))
         bytes_pad = max((len(text) for text in bytes_texts), default=0)
 
     lines: list[str] = []

@@ -13,6 +13,35 @@ class Instruction:
     bytes: bytes
     mnemonic: str
     operands: str
+    byte_size: int = 0
+
+    def __post_init__(self) -> None:
+        if self.byte_size <= 0 and self.bytes:
+            object.__setattr__(self, "byte_size", len(self.bytes))
+
+    @property
+    def opcode_bytes(self) -> bytes:
+        if self.byte_size > 0 and len(self.bytes) > self.byte_size:
+            return self.bytes[: self.byte_size]
+        return self.bytes
+
+
+def _safe_int(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except Exception:
+        return 0
+
+
+def _instruction_byte_size(inst: Any, data: Any) -> int:
+    size = _safe_int(inst.GetByteSize())
+    if size > 0:
+        return size
+    if data is not None and data.IsValid():
+        size = _safe_int(data.GetByteSize())
+        if size > 0:
+            return size
+    return 0
 
 
 def disasm_flavor(arch) -> str:
@@ -48,12 +77,16 @@ def read_instructions(
         inst_addr = inst.GetAddress().GetLoadAddress(target)
         data = inst.GetData(target)
         bytes_list = list(data.uint8) if data.IsValid() else []
+        byte_size = _instruction_byte_size(inst, data)
+        if byte_size > 0 and len(bytes_list) > byte_size:
+            bytes_list = bytes_list[:byte_size]
         output.append(
             Instruction(
                 address=inst_addr,
                 bytes=bytes(bytes_list),
                 mnemonic=inst.GetMnemonic(target),
                 operands=inst.GetOperands(target),
+                byte_size=byte_size,
             )
         )
     return output
