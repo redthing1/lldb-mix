@@ -35,6 +35,60 @@ WIN64 = AbiSpec(
     caller_saved=("rax", "rcx", "rdx", "r8", "r9", "r10", "r11"),
 )
 
+SYSV_X86 = AbiSpec(
+    name="sysv32",
+    int_arg_regs=(),
+    return_reg="eax",
+    stack_alignment=16,
+    callee_saved=("ebx", "ebp", "esi", "edi", "esp"),
+    caller_saved=("eax", "ecx", "edx"),
+)
+
+WIN32 = AbiSpec(
+    name="win32",
+    int_arg_regs=(),
+    return_reg="eax",
+    stack_alignment=4,
+    callee_saved=("ebx", "ebp", "esi", "edi", "esp"),
+    caller_saved=("eax", "ecx", "edx"),
+)
+
+WIN32_CDECL = AbiSpec(
+    name="win32-cdecl",
+    int_arg_regs=(),
+    return_reg="eax",
+    stack_alignment=4,
+    callee_saved=("ebx", "ebp", "esi", "edi", "esp"),
+    caller_saved=("eax", "ecx", "edx"),
+)
+
+WIN32_STDCALL = AbiSpec(
+    name="win32-stdcall",
+    int_arg_regs=(),
+    return_reg="eax",
+    stack_alignment=4,
+    callee_saved=("ebx", "ebp", "esi", "edi", "esp"),
+    caller_saved=("eax", "ecx", "edx"),
+)
+
+WIN32_FASTCALL = AbiSpec(
+    name="win32-fastcall",
+    int_arg_regs=("ecx", "edx"),
+    return_reg="eax",
+    stack_alignment=4,
+    callee_saved=("ebx", "ebp", "esi", "edi", "esp"),
+    caller_saved=("eax", "ecx", "edx"),
+)
+
+WIN32_THISCALL = AbiSpec(
+    name="win32-thiscall",
+    int_arg_regs=("ecx",),
+    return_reg="eax",
+    stack_alignment=4,
+    callee_saved=("ebx", "ebp", "esi", "edi", "esp"),
+    caller_saved=("eax", "ecx", "edx"),
+)
+
 AAPCS64 = AbiSpec(
     name="aapcs64",
     int_arg_regs=("x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7"),
@@ -82,6 +136,12 @@ RISCV_X_ABI = AbiSpec(
 ABI_BY_NAME = {
     SYSV_X64.name: SYSV_X64,
     WIN64.name: WIN64,
+    SYSV_X86.name: SYSV_X86,
+    WIN32.name: WIN32,
+    WIN32_CDECL.name: WIN32_CDECL,
+    WIN32_STDCALL.name: WIN32_STDCALL,
+    WIN32_FASTCALL.name: WIN32_FASTCALL,
+    WIN32_THISCALL.name: WIN32_THISCALL,
     AAPCS64.name: AAPCS64,
     AAPCS32.name: AAPCS32,
     RISCV_ABI.name: RISCV_ABI,
@@ -91,6 +151,12 @@ ABI_BY_NAME = {
 ABI_ARCHES = {
     "sysv": ("x86_64", "amd64"),
     "win64": ("x86_64", "amd64"),
+    "sysv32": ("i386", "i486", "i586", "i686"),
+    "win32": ("i386", "i486", "i586", "i686"),
+    "win32-cdecl": ("i386", "i486", "i586", "i686"),
+    "win32-stdcall": ("i386", "i486", "i586", "i686"),
+    "win32-fastcall": ("i386", "i486", "i586", "i686"),
+    "win32-thiscall": ("i386", "i486", "i586", "i686"),
     "aapcs64": ("arm64", "aarch64"),
     "aapcs32": ("arm32", "armv", "thumb"),
     "riscv": ("riscv64", "riscv32", "riscv"),
@@ -127,6 +193,11 @@ def select_abi(triple: str, arch_name: str) -> AbiSpec | None:
         if any(token in triple_lower for token in ("windows", "mingw", "msvc")):
             return WIN64
         return SYSV_X64
+
+    if any(token in arch_lower for token in ("i386", "i486", "i586", "i686")):
+        if any(token in triple_lower for token in ("windows", "mingw", "msvc")):
+            return WIN32
+        return SYSV_X86
 
     if "arm64" in arch_lower or "aarch64" in arch_lower:
         return AAPCS64

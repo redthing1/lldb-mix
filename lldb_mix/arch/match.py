@@ -2,6 +2,7 @@ from __future__ import annotations
 
 ARCH_FAMILIES: dict[str, tuple[str, ...]] = {
     "x86_64": ("x86_64", "amd64", "x64"),
+    "x86": ("i386", "i486", "i586", "i686", "i86pc", "x86-32", "x86_32"),
     "arm64": ("arm64", "aarch64"),
     "arm32": ("armv", "arm32", "arm-", "thumb"),
     "riscv": ("riscv", "rv32", "rv64"),

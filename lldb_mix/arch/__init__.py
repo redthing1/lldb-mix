@@ -5,6 +5,7 @@ __all__ = [
     "reginfo",
     "view",
     "x64",
+    "x86",
     "arm64",
     "arm32",
     "riscv",

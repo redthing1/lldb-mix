@@ -5,6 +5,7 @@ from lldb_mix.arch.arm64 import ARM64_ARCH
 from lldb_mix.arch.info import ArchInfo
 from lldb_mix.arch.registry import detect_arch_info
 from lldb_mix.arch.x64 import X64_ARCH
+from lldb_mix.arch.x86 import X86_ARCH
 
 
 class TestArchRegistry(unittest.TestCase):
@@ -67,6 +68,42 @@ class TestArchRegistry(unittest.TestCase):
         self.assertEqual(arch.name, ARM32_ARCH.name)
         self.assertIsNotNone(arch.abi)
         self.assertEqual(arch.abi.name, "aapcs32")
+
+    def test_detect_x86_sysv32(self):
+        info = ArchInfo.from_register_sets(
+            triple="i386-pc-linux-gnu",
+            arch_name="i386",
+            ptr_size=4,
+            reg_sets={"General Purpose Registers": ["eax", "eip", "esp"]},
+        )
+        arch = detect_arch_info(info)
+        self.assertEqual(arch.name, X86_ARCH.name)
+        self.assertIsNotNone(arch.abi)
+        self.assertEqual(arch.abi.name, "sysv32")
+
+    def test_detect_x86_win32(self):
+        info = ArchInfo.from_register_sets(
+            triple="i686-pc-windows-msvc",
+            arch_name="i686",
+            ptr_size=4,
+            reg_sets={"General Purpose Registers": ["eax", "eip", "esp"]},
+        )
+        arch = detect_arch_info(info)
+        self.assertEqual(arch.name, X86_ARCH.name)
+        self.assertIsNotNone(arch.abi)
+        self.assertEqual(arch.abi.name, "win32")
+
+    def test_detect_x86_override_fastcall(self):
+        info = ArchInfo.from_register_sets(
+            triple="i686-pc-windows-msvc",
+            arch_name="i686",
+            ptr_size=4,
+            reg_sets={"General Purpose Registers": ["eax", "eip", "esp"]},
+        )
+        arch = detect_arch_info(info, abi_override="win32-fastcall")
+        self.assertEqual(arch.name, X86_ARCH.name)
+        self.assertIsNotNone(arch.abi)
+        self.assertEqual(arch.abi.name, "win32-fastcall")
 
     def test_detect_x64_from_regs(self):
         info = ArchInfo.from_register_sets(
