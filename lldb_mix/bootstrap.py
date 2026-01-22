@@ -7,23 +7,13 @@ from lldb_mix.core.stop_hooks import ensure_stop_hook
 from lldb_mix.core.stop_output import apply_quiet, capture_defaults, restore_defaults
 from lldb_mix.core.version import parse_lldb_version
 from lldb_mix.ui.console import banner, err
-from lldb_mix.ui.prompt import (
-    prompt_ansi_prefix,
-    prompt_ansi_suffix,
-    prompt_text,
-)
+from lldb_mix.ui.prompt import PROMPT_COMMANDS
 
 
 def _set_prompt(debugger) -> None:
     try:
-        debugger.HandleCommand(f'settings set prompt "{prompt_text()}"')
-        debugger.HandleCommand("settings set use-color true")
-        debugger.HandleCommand(
-            f'settings set prompt-ansi-prefix "{prompt_ansi_prefix()}"'
-        )
-        debugger.HandleCommand(
-            f'settings set prompt-ansi-suffix "{prompt_ansi_suffix()}"'
-        )
+        for command in PROMPT_COMMANDS:
+            debugger.HandleCommand(command)
     except Exception as exc:
         err(f"failed to set prompt: {exc}")
 
