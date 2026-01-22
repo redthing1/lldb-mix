@@ -277,6 +277,14 @@ _SPECS: list[SettingSpec] = [
         validate=_is_bool,
     ),
     SettingSpec(
+        key="lldb_formats",
+        attr="lldb_formats",
+        type_name="bool",
+        parse=_parse_bool,
+        format=_fmt_bool,
+        validate=_is_bool,
+    ),
+    SettingSpec(
         key="theme",
         attr="theme",
         type_name="theme",

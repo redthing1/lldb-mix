@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 @dataclass
 class Settings:
     enable_color: bool = True
+    lldb_formats: bool = True
     theme: str = "base"
     layout: list[str] = field(
         default_factory=lambda: [

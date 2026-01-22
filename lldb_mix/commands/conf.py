@@ -11,6 +11,7 @@ from lldb_mix.core.config import (
     save_settings,
     set_setting,
 )
+from lldb_mix.core.lldb_formats import sync_formats
 from lldb_mix.core.state import SETTINGS
 from lldb_mix.core.stop_hooks import ensure_stop_hook, remove_stop_hook
 from lldb_mix.core.stop_output import apply_quiet, capture_defaults, restore_defaults
@@ -105,6 +106,8 @@ def _handle_set(debugger, args: list[str]) -> str:
         return f"[lldb-mix] {message}"
     if key == "auto_context":
         _sync_auto_context(debugger)
+    if key in ("enable_color", "theme", "lldb_formats"):
+        _sync_lldb_formats(debugger)
     return f"[lldb-mix] {key} = {message}"
 
 
@@ -118,12 +121,14 @@ def _handle_load(debugger) -> str:
     if not load_settings(SETTINGS):
         return "[lldb-mix] no settings found"
     _sync_auto_context(debugger)
+    _sync_lldb_formats(debugger)
     return "[lldb-mix] settings loaded"
 
 
 def _handle_default(debugger) -> str:
     reset_settings(SETTINGS)
     _sync_auto_context(debugger)
+    _sync_lldb_formats(debugger)
     return "[lldb-mix] settings reset to defaults"
 
 
@@ -135,6 +140,10 @@ def _sync_auto_context(debugger) -> None:
     else:
         remove_stop_hook(debugger, "context")
         restore_defaults(debugger)
+
+
+def _sync_lldb_formats(debugger) -> None:
+    sync_formats(debugger, SETTINGS)
 
 
 def _usage() -> str:

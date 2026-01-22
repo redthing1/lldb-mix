@@ -26,6 +26,7 @@ conf list                     # list settings
 conf get <key>                # show a setting
 conf set <key> <value...>     # update a setting
 conf set abi auto|sysv|win64|sysv32|win32|win32-cdecl|win32-stdcall|win32-fastcall|win32-thiscall|aapcs64|aapcs32|riscv|riscv-x  # override ABI selection (applies per-arch)
+conf set lldb_formats on|off  # toggle lldb backtrace formatting
 conf default                 # reset settings to defaults (not persisted)
 conf save                     # persist settings (OS-specific config path)
 conf load                     # load settings (OS-specific config path)

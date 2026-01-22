@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from lldb_mix.commands.registry import register_commands
 from lldb_mix.core.config import load_settings
+from lldb_mix.core.lldb_formats import sync_formats
 from lldb_mix.core.state import SETTINGS
 from lldb_mix.core.stop_hooks import ensure_stop_hook
 from lldb_mix.core.stop_output import apply_quiet, capture_defaults, restore_defaults
@@ -38,6 +39,7 @@ def init(debugger, internal_dict) -> None:
     load_settings(SETTINGS)
     _set_prompt(debugger)
     _set_sync(debugger)
+    sync_formats(debugger, SETTINGS)
     capture_defaults(debugger)
     if SETTINGS.auto_context:
         apply_quiet(debugger)
