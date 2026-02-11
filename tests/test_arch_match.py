@@ -44,6 +44,7 @@ class TestArchMatch(unittest.TestCase):
         self.assertEqual(profile_family("arm64"), "arm64")
         self.assertEqual(profile_family("arm32"), "arm32")
         self.assertEqual(profile_family("riscv64"), "riscv")
+        self.assertEqual(profile_family("mips64el"), "mips")
         self.assertIsNone(profile_family("custom-arch"))
 
 

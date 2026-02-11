@@ -3,6 +3,7 @@ import unittest
 from lldb_mix.arch.arm32 import ARM32_ARCH
 from lldb_mix.arch.arm64 import ARM64_ARCH
 from lldb_mix.arch.info import ArchInfo
+from lldb_mix.arch.mips import MIPS64EL_ARCH
 from lldb_mix.arch.registry import detect_arch_info
 from lldb_mix.arch.x64 import X64_ARCH
 from lldb_mix.arch.x86 import X86_ARCH
@@ -139,26 +140,25 @@ class TestArchRegistry(unittest.TestCase):
         arch = detect_arch_info(info)
         self.assertEqual(arch.name, ARM32_ARCH.name)
 
-    def test_unknown_explicit_family_does_not_fallback_to_riscv(self):
+    def test_detect_mips64el_from_triple(self):
         info = ArchInfo.from_register_sets(
             triple="mips64el-unknown-unknown",
             arch_name="mips64el",
             ptr_size=8,
             reg_sets={
                 "General Purpose Registers": [
-                    "zero",
-                    "ra",
-                    "sp",
-                    "gp",
-                    "a0",
-                    "a1",
+                    "r2",
+                    "r4",
+                    "r28",
+                    "r29",
+                    "r31",
                     "pc",
                 ]
             },
         )
         arch = detect_arch_info(info)
-        self.assertEqual(arch.name, "mips64el")
-        self.assertIsNone(arch.profile)
+        self.assertEqual(arch.name, MIPS64EL_ARCH.name)
+        self.assertIsNotNone(arch.profile)
         self.assertIsNone(arch.abi)
 
     def test_any_unsupported_triple_family_does_not_guess_profile(self):
@@ -168,11 +168,11 @@ class TestArchRegistry(unittest.TestCase):
             ptr_size=8,
             reg_sets={
                 "General Purpose Registers": [
-                    "zero",
                     "ra",
                     "sp",
                     "a0",
                     "a1",
+                    "zero",
                     "pc",
                 ]
             },

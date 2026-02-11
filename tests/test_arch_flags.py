@@ -2,6 +2,7 @@ import unittest
 
 from lldb_mix.arch.arm32 import ARM32_ARCH
 from lldb_mix.arch.arm64 import ARM64_ARCH
+from lldb_mix.arch.mips import MIPS64EL_ARCH
 from lldb_mix.arch.x64 import X64_ARCH
 
 
@@ -35,6 +36,17 @@ class TestArchFlags(unittest.TestCase):
         taken, reason = ARM64_ARCH.branch_taken("b.eq", z)
         self.assertTrue(taken)
         self.assertEqual(reason, "z=1")
+
+    def test_mips_branch_decision_signed(self):
+        decision = MIPS64EL_ARCH.branch_decision(
+            "bgez",
+            "$a0, 0x1000",
+            {"a0": -1},
+            flags=0,
+        )
+        self.assertIsNotNone(decision)
+        self.assertFalse(decision.taken)
+        self.assertEqual(decision.reason, "$a0>=0")
 
 
 if __name__ == "__main__":

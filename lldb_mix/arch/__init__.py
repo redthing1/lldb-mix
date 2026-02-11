@@ -9,5 +9,6 @@ __all__ = [
     "arm64",
     "arm32",
     "riscv",
+    "mips",
     "registry",
 ]

@@ -1,6 +1,7 @@
 import unittest
 
 from lldb_mix.arch.arm64 import ARM64_ARCH
+from lldb_mix.arch.mips import MIPS64EL_ARCH
 from lldb_mix.arch.riscv import RISCV64_ABI_ARCH
 from lldb_mix.arch.x64 import X64_ARCH
 from lldb_mix.core.flow import is_branch_like, resolve_flow_target
@@ -16,6 +17,11 @@ class TestFlowTargets(unittest.TestCase):
         arch = make_arch_view(X64_ARCH, gpr_names=("rax", "rip", "rsp"), ptr_size=8)
         self.assertTrue(is_branch_like("loop", arch))
         self.assertTrue(is_branch_like("jrcxz", arch))
+
+    def test_branch_like_mips(self):
+        arch = make_arch_view(MIPS64EL_ARCH, gpr_names=("a0", "sp", "pc"), ptr_size=8)
+        self.assertTrue(is_branch_like("beq", arch))
+        self.assertTrue(is_branch_like("jal", arch))
 
     def test_riscv_jal_target(self):
         self.assertEqual(
@@ -94,6 +100,29 @@ class TestFlowTargets(unittest.TestCase):
                 make_arch_view(RISCV64_ABI_ARCH, gpr_names=("ra",), ptr_size=8),
             ),
             0x2000,
+        )
+
+    def test_mips_jal_target(self):
+        self.assertEqual(
+            resolve_flow_target(
+                "jal",
+                "0x4000",
+                {},
+                make_arch_view(MIPS64EL_ARCH, gpr_names=("ra",), ptr_size=8),
+            ),
+            0x4000,
+        )
+
+    def test_mips_jr_target_with_dollar_operand(self):
+        regs = {"ra": 0x5000}
+        self.assertEqual(
+            resolve_flow_target(
+                "jr",
+                "$ra",
+                regs,
+                make_arch_view(MIPS64EL_ARCH, gpr_names=("ra",), ptr_size=8),
+            ),
+            0x5000,
         )
 
     def test_x64_ret_target(self):

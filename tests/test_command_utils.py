@@ -1,6 +1,7 @@
 import unittest
 
 from lldb_mix.core.addressing import default_addr, parse_int, resolve_addr
+from lldb_mix.arch.mips import MIPS64EL_ARCH
 from lldb_mix.arch.riscv import RISCV64_X_ARCH
 from tests.arch_test_utils import make_arch_view
 
@@ -31,6 +32,11 @@ class TestCommandUtils(unittest.TestCase):
     def test_resolve_addr_arch_alias(self):
         regs = {"x2": 0x1111}
         arch = make_arch_view(RISCV64_X_ARCH, gpr_names=("x2",), ptr_size=8)
+        self.assertEqual(resolve_addr("sp", regs, arch), 0x1111)
+
+    def test_resolve_addr_mips_sp_alias_from_numeric_reg(self):
+        regs = {"r29": 0x1111}
+        arch = make_arch_view(MIPS64EL_ARCH, gpr_names=("r29",), ptr_size=8)
         self.assertEqual(resolve_addr("sp", regs, arch), 0x1111)
 
     def test_resolve_addr_pc_alias(self):
