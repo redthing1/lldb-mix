@@ -6,7 +6,10 @@ from typing import Any
 from lldb_mix.arch.base import ArchProfile, BranchDecision, ReadPointer
 from lldb_mix.arch import abi as arch_abi
 from lldb_mix.arch.info import ArchInfo
+from lldb_mix.arch.match import triple_arch_token
 from lldb_mix.core.regs import find_register_any
+
+_GENERIC_ARCH_TOKENS = {"", "unknown", "none", "generic"}
 
 
 @dataclass(frozen=True)
@@ -18,6 +21,9 @@ class ArchView:
     def name(self) -> str:
         if self.profile and getattr(self.profile, "name", ""):
             return self.profile.name
+        triple_name = triple_arch_token(self.info.triple)
+        if triple_name and triple_name not in _GENERIC_ARCH_TOKENS:
+            return triple_name
         return self.info.arch_name or "unknown"
 
     @property

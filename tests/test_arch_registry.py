@@ -139,6 +139,70 @@ class TestArchRegistry(unittest.TestCase):
         arch = detect_arch_info(info)
         self.assertEqual(arch.name, ARM32_ARCH.name)
 
+    def test_unknown_explicit_family_does_not_fallback_to_riscv(self):
+        info = ArchInfo.from_register_sets(
+            triple="mips64el-unknown-unknown",
+            arch_name="mips64el",
+            ptr_size=8,
+            reg_sets={
+                "General Purpose Registers": [
+                    "zero",
+                    "ra",
+                    "sp",
+                    "gp",
+                    "a0",
+                    "a1",
+                    "pc",
+                ]
+            },
+        )
+        arch = detect_arch_info(info)
+        self.assertEqual(arch.name, "mips64el")
+        self.assertIsNone(arch.profile)
+        self.assertIsNone(arch.abi)
+
+    def test_any_unsupported_triple_family_does_not_guess_profile(self):
+        info = ArchInfo.from_register_sets(
+            triple="loongarch64-unknown-linux-gnu",
+            arch_name="loongarch64",
+            ptr_size=8,
+            reg_sets={
+                "General Purpose Registers": [
+                    "zero",
+                    "ra",
+                    "sp",
+                    "a0",
+                    "a1",
+                    "pc",
+                ]
+            },
+        )
+        arch = detect_arch_info(info)
+        self.assertEqual(arch.name, "loongarch64")
+        self.assertIsNone(arch.profile)
+        self.assertIsNone(arch.abi)
+
+    def test_unsupported_triple_prevents_guess_with_supported_arch_name(self):
+        info = ArchInfo.from_register_sets(
+            triple="loongarch64-unknown-linux-gnu",
+            arch_name="riscv64",
+            ptr_size=8,
+            reg_sets={
+                "General Purpose Registers": [
+                    "zero",
+                    "ra",
+                    "sp",
+                    "a0",
+                    "a1",
+                    "pc",
+                ]
+            },
+        )
+        arch = detect_arch_info(info)
+        self.assertEqual(arch.name, "loongarch64")
+        self.assertIsNone(arch.profile)
+        self.assertIsNone(arch.abi)
+
 
 if __name__ == "__main__":
     unittest.main()

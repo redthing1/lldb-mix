@@ -8,7 +8,11 @@ from typing import Callable
 from lldb_mix.arch.abi import abi_matches_arch, lookup_abi, select_abi
 from lldb_mix.arch.base import ArchProfile
 from lldb_mix.arch.info import ArchInfo
-from lldb_mix.arch.match import allows_family, explicit_family, family_in_text
+from lldb_mix.arch.match import (
+    declared_family,
+    is_explicitly_unsupported_arch,
+    profile_family,
+)
 from lldb_mix.arch.view import ArchView
 
 _MATCHERS: list[tuple[ArchProfile, Callable[[ArchInfo], int]]] = []
@@ -45,16 +49,14 @@ def detect_arch_info(info: ArchInfo, abi_override: str | None = None) -> ArchVie
 
 def select_profile(info: ArchInfo) -> ArchProfile | None:
     _ensure_profiles_loaded()
-    family = _explicit_family(info)
+    family = declared_family(info.triple, info.arch_name)
+    if not family and is_explicitly_unsupported_arch(info.triple, info.arch_name):
+        return None
     best: ArchProfile | None = None
     best_score = 0
     for profile, matcher in _MATCHERS:
-        profile_family = explicit_family(profile.name or "")
-        if profile_family and not allows_family(
-            info.triple, info.arch_name, profile_family
-        ):
-            continue
-        if family and not _profile_matches_family(profile, family):
+        profile_arch_family = profile_family(profile.name or "")
+        if family and profile_arch_family != family:
             continue
         try:
             score = int(matcher(info))
@@ -66,18 +68,6 @@ def select_profile(info: ArchInfo) -> ArchProfile | None:
     if best_score <= 0:
         return None
     return best
-
-
-def _explicit_family(info: ArchInfo) -> str | None:
-    triple_family = explicit_family(info.triple or "")
-    if triple_family:
-        return triple_family
-    return explicit_family(info.arch_name or "")
-
-
-def _profile_matches_family(profile: ArchProfile, family: str) -> bool:
-    name = profile.name or ""
-    return family_in_text(name, family)
 
 
 def _ensure_profiles_loaded() -> None:
